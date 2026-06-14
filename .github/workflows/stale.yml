@@ -1,0 +1,69 @@
+name: Stale Issues and PRs
+
+on:
+  schedule:
+    # Run daily at 1:00 AM UTC
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Mark Stale Issues and PRs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stale Issue and PR Management
+        uses: actions/stale@v10
+        with:
+          # General settings
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Stale PR settings
+          days-before-pr-stale: 60 # Mark PRs stale after 60 days of inactivity
+          days-before-pr-close: 14 # Close stale PRs after 14 more days
+          stale-pr-message: |
+            This pull request has been automatically marked as stale because it has had no activity for 60 days.
+            It will be closed in 14 days if no further activity occurs.
+
+            If this PR is still relevant, please comment or push new commits to keep it open.
+          close-pr-message: |
+            This pull request has been automatically closed due to inactivity.
+
+            If you believe this PR should remain open, please reopen it and provide an update.
+          stale-pr-label: 'stale'
+
+          # Stale issue settings
+          days-before-issue-stale: 90 # Mark issues stale after 90 days of inactivity
+          days-before-issue-close: 30 # Close stale issues after 30 more days
+          stale-issue-message: |
+            This issue has been automatically marked as stale because it has had no activity for 90 days.
+            It will be closed in 30 days if no further activity occurs.
+
+            If this issue is still relevant, please comment to keep it open.
+          close-issue-message: |
+            This issue has been automatically closed due to inactivity.
+
+            If you believe this issue should remain open, please reopen it and provide an update.
+          stale-issue-label: 'stale'
+
+          # Exemptions
+          exempt-pr-labels: 'pinned,security,work-in-progress'
+          exempt-issue-labels: 'pinned,security,enhancement'
+          exempt-all-pr-assignees: true # Don't mark PRs with assignees as stale
+          exempt-all-issue-assignees: false # Still mark assigned issues as stale
+          exempt-all-milestones: true # Don't mark issues/PRs with milestones as stale
+
+          # Activity settings
+          remove-stale-when-updated: true # Remove stale label if activity resumes
+
+          # Rate limiting
+          operations-per-run: 30 # Limit operations to avoid hitting GitHub API limits
+
+          # Performance optimization
+          ascending: true # Process oldest first
+
+          # Branch cleanup (requires contents: write permission)
+          delete-branch: false # Don't auto-delete branches (can be enabled later)

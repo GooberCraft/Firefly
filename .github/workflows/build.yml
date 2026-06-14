@@ -1,0 +1,121 @@
+name: Build
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    strategy:
+      # Don't cancel all matrix jobs if one fails
+      fail-fast: false
+      matrix:
+        # paper-api 1.21 ships Java 21 bytecode, so Java 17 cannot consume it and
+        # is intentionally not part of the matrix (the floor is Java 21).
+        java-version: [21, 25]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Set up JDK ${{ matrix.java-version }}
+      uses: actions/setup-java@v5
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: 'temurin'
+        cache: maven
+
+    # Optional: Cache compiled classes for faster rebuilds
+    - name: Cache build output
+      uses: actions/cache@v5
+      with:
+        path: target
+        key: ${{ runner.os }}-maven-build-${{ matrix.java-version }}-${{ hashFiles('**/pom.xml', 'src/**') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-build-${{ matrix.java-version }}-
+
+    # Combined: Build, test, and enforce Jacoco coverage gate in one command.
+    # `verify` is required (not `package`) because jacoco:check is bound to the verify phase.
+    - name: Build, test, and verify coverage
+      run: mvn clean verify
+
+    # Only publish test results from the Java 21 build (reduces noise)
+    - name: Publish test results
+      if: always() && matrix.java-version == 21
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      with:
+        files: target/surefire-reports/TEST-*.xml
+
+    # Only upload coverage from Java 21, optional until token is configured
+    - name: Upload coverage reports
+      if: matrix.java-version == 21 && github.event_name == 'push'
+      uses: codecov/codecov-action@v7
+      with:
+        files: target/site/jacoco/jacoco.xml
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}  # Optional: set this secret if using Codecov
+
+    # Only need version and artifact from the Java 21 build
+    - name: Get version from pom.xml
+      if: matrix.java-version == 21
+      id: get_version
+      run: echo "VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
+      if: matrix.java-version == 21
+      uses: actions/upload-artifact@v7
+      with:
+        name: Firefly-${{ steps.get_version.outputs.VERSION }}
+        path: target/Firefly-${{ steps.get_version.outputs.VERSION }}.jar
+        if-no-files-found: error
+        retention-days: 30
+
+  # Forward-compatibility check: the main build targets the 1.21 API floor, this
+  # compiles and tests against the newest supported API (the `ceiling` Maven
+  # profile pins paper-api to 26.1.x). Blocking, so a forward-incompat change
+  # can't merge. The ceiling is a SNAPSHOT, so this may go red when the upstream
+  # API moves even without a code change here — that's the signal. Runs on Java
+  # 25 to mirror the real 26.1 server runtime, which requires Java 25.
+  ceiling:
+    name: Ceiling compat (26.1 API)
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v5
+      with:
+        java-version: 25
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache build output
+      uses: actions/cache@v5
+      with:
+        path: target
+        key: ${{ runner.os }}-maven-ceiling-${{ hashFiles('**/pom.xml', 'src/**') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-ceiling-
+
+    # Full verify (compile main + test + coverage gate) against the ceiling API.
+    - name: Build and test against ceiling API
+      run: mvn clean verify -Pceiling

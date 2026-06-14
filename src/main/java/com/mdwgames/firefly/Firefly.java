@@ -4,6 +4,7 @@ import com.mdwgames.firefly.command.FireflyCommand;
 import com.mdwgames.firefly.data.PreferenceStore;
 import com.mdwgames.firefly.listener.PlayerSessionListener;
 import com.mdwgames.firefly.locator.WaypointManager;
+import org.bstats.bukkit.Metrics;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -48,6 +49,9 @@ public final class Firefly extends JavaPlugin {
         } else {
             getLogger().warning("Failed to register the /firefly command — is it declared in plugin.yml?");
         }
+
+        final int pluginId = 31993;
+        new Metrics(this, pluginId);
 
         getLogger().info("Firefly enabled (admin-bypass default=" + bypassDefault + ").");
     }

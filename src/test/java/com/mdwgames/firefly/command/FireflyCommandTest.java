@@ -3,6 +3,7 @@ package com.mdwgames.firefly.command;
 import com.mdwgames.firefly.data.PreferenceStore;
 import com.mdwgames.firefly.locator.WaypointManager;
 import org.bukkit.command.Command;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,8 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,9 +57,18 @@ class FireflyCommandTest {
         return p;
     }
 
-    private void run(final PlayerMock p, final String... args) {
-        cmd.onCommand(p, bukkitCmd, "firefly", args);
+    /** A player with both self-service and admin permissions. */
+    private PlayerMock admin() {
+        final PlayerMock p = user();
+        p.addAttachment(plugin, FireflyCommand.PERM_ADMIN, true);
+        return p;
     }
+
+    private void run(final org.bukkit.command.CommandSender s, final String... args) {
+        cmd.onCommand(s, bukkitCmd, "firefly", args);
+    }
+
+    // ========== Self-service ==========
 
     @Test
     @DisplayName("hide/show/toggle flip the stored hidden state")
@@ -76,7 +88,7 @@ class FireflyCommandTest {
     }
 
     @Test
-    @DisplayName("color sets a named color and reset clears it")
+    @DisplayName("color sets named and hex colors, and reset/clear remove it")
     void colorSetAndReset() {
         final PlayerMock p = user();
 
@@ -84,17 +96,87 @@ class FireflyCommandTest {
         assertNotNull(store.getColor(p.getUniqueId()));
         assertTrue(store.getColor(p.getUniqueId()) == 0xFF5555);
 
+        run(p, "colour", "#FF8800"); // alias + hex
+        assertTrue(store.getColor(p.getUniqueId()) == 0xFF8800);
+
         run(p, "color", "reset");
+        assertNull(store.getColor(p.getUniqueId()));
+
+        run(p, "color", "aqua");
+        run(p, "color", "clear");
         assertNull(store.getColor(p.getUniqueId()));
     }
 
     @Test
-    @DisplayName("an invalid color is rejected and nothing is stored")
+    @DisplayName("color with no argument and with an invalid value store nothing")
     void colorInvalid() {
         final PlayerMock p = user();
+
+        run(p, "color"); // missing argument -> usage
+        assertNull(store.getColor(p.getUniqueId()));
+
         run(p, "color", "notacolor");
         assertNull(store.getColor(p.getUniqueId()));
     }
+
+    // ========== Admin ==========
+
+    @Test
+    @DisplayName("bypass on/off/toggle/invalid update the runtime bypass")
+    void bypassVariants() {
+        final PlayerMock a = admin();
+
+        run(a, "bypass", "on");
+        assertTrue(store.isBypassing(a.getUniqueId()));
+        run(a, "bypass", "off");
+        assertFalse(store.isBypassing(a.getUniqueId()));
+        run(a, "bypass", "toggle");
+        assertTrue(store.isBypassing(a.getUniqueId()));
+        run(a, "bypass");          // no arg -> toggle
+        assertFalse(store.isBypassing(a.getUniqueId()));
+        run(a, "bypass", "huh");   // invalid -> usage, no change
+        assertFalse(store.isBypassing(a.getUniqueId()));
+    }
+
+    @Test
+    @DisplayName("showhidden lists hidden players (online and offline) or reports none")
+    void showHidden() {
+        final PlayerMock a = admin();
+
+        run(a, "showhidden"); // none hidden yet
+        assertNotNull(a.nextMessage());
+
+        final PlayerMock hiddenOnline = user();
+        store.setHidden(hiddenOnline.getUniqueId(), true);
+        store.setHidden(UUID.randomUUID(), true); // an offline/unknown player
+
+        run(a, "showhidden");
+        assertNotNull(a.nextMessage());
+    }
+
+    @Test
+    @DisplayName("reload reloads config and player data")
+    void reload() {
+        final PlayerMock a = admin();
+        run(a, "reload");
+        assertNotNull(a.nextMessage());
+    }
+
+    @Test
+    @DisplayName("help and the bare command print usage for both permission tiers")
+    void help() {
+        final PlayerMock u = user();
+        run(u);          // bare -> help
+        assertNotNull(u.nextMessage());
+        run(u, "help");
+        assertNotNull(u.nextMessage());
+
+        final PlayerMock a = admin();
+        run(a, "help");  // exercises the admin help branch
+        assertNotNull(a.nextMessage());
+    }
+
+    // ========== Permission gating ==========
 
     @Test
     @DisplayName("firefly.use is required: a player without it cannot hide")
@@ -105,16 +187,23 @@ class FireflyCommandTest {
     }
 
     @Test
-    @DisplayName("firefly.admin is required for bypass")
+    @DisplayName("firefly.admin is required for bypass, showhidden, and reload")
     void adminGating() {
         final PlayerMock nonAdmin = user();
         run(nonAdmin, "bypass", "on");
         assertFalse(store.isBypassing(nonAdmin.getUniqueId()));
+        run(nonAdmin, "showhidden");
+        run(nonAdmin, "reload");
+        assertNotNull(nonAdmin.nextMessage());
+    }
 
-        final PlayerMock admin = server.addPlayer();
-        admin.addAttachment(plugin, FireflyCommand.PERM_ADMIN, true);
-        run(admin, "bypass", "on");
-        assertTrue(store.isBypassing(admin.getUniqueId()));
+    @Test
+    @DisplayName("console cannot run player-only subcommands")
+    void consoleRejected() {
+        final ConsoleCommandSender console = server.getConsoleSender();
+        run(console, "hide");            // requireUser -> not a player
+        run(console, "bypass", "on");    // requireAdminPlayer -> not a player (console has perms)
+        // no exception; commands handled gracefully
     }
 
     @Test
@@ -123,6 +212,39 @@ class FireflyCommandTest {
         final PlayerMock p = user();
         final boolean handled = cmd.onCommand(p, bukkitCmd, "firefly", new String[]{"frobnicate"});
         assertTrue(handled);
-        assertNotNull(p.nextMessage()); // a reply was sent
+        assertNotNull(p.nextMessage());
+    }
+
+    // ========== Tab completion ==========
+
+    @Test
+    @DisplayName("first-argument completion is gated by permission")
+    void tabCompleteSubcommands() {
+        final PlayerMock u = user();
+        final List<String> userSubs = cmd.onTabComplete(u, bukkitCmd, "firefly", new String[]{""});
+        assertNotNull(userSubs);
+        assertTrue(userSubs.contains("hide"));
+        assertFalse(userSubs.contains("reload")); // admin-only hidden from a plain user
+
+        final PlayerMock a = admin();
+        final List<String> adminSubs = cmd.onTabComplete(a, bukkitCmd, "firefly", new String[]{"re"});
+        assertTrue(adminSubs.contains("reload"));
+    }
+
+    @Test
+    @DisplayName("second-argument completion offers colors and bypass states")
+    void tabCompleteArgs() {
+        final PlayerMock a = admin();
+
+        final List<String> colors = cmd.onTabComplete(a, bukkitCmd, "firefly", new String[]{"color", "a"});
+        assertTrue(colors.contains("aqua"));
+
+        final List<String> bypass = cmd.onTabComplete(a, bukkitCmd, "firefly", new String[]{"bypass", ""});
+        assertTrue(bypass.contains("on"));
+        assertTrue(bypass.contains("toggle"));
+
+        // unknown second arg and a third arg yield no suggestions
+        assertTrue(cmd.onTabComplete(a, bukkitCmd, "firefly", new String[]{"hide", ""}).isEmpty());
+        assertTrue(cmd.onTabComplete(a, bukkitCmd, "firefly", new String[]{"color", "red", ""}).isEmpty());
     }
 }

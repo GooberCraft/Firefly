@@ -1,0 +1,109 @@
+name: Bug Report
+description: Report a bug or issue with Firefly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us fix the issue.
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin Version
+      description: What version of Firefly are you using?
+      placeholder: e.g., 1.0
+    validations:
+      required: true
+
+  - type: input
+    id: minecraft-version
+    attributes:
+      label: Minecraft Version
+      description: What Minecraft version is your server running? (The locator bar requires 1.21.6+.)
+      placeholder: e.g., 1.21.6
+    validations:
+      required: true
+
+  - type: input
+    id: server-software
+    attributes:
+      label: Server Software
+      description: What server software are you using?
+      placeholder: e.g., Paper 1.21.6, Spigot 1.21.6, Purpur 1.21.6
+    validations:
+      required: true
+
+  - type: input
+    id: packetevents-version
+    attributes:
+      label: packetevents Version
+      description: What version of the packetevents plugin is installed? (Firefly requires it.)
+      placeholder: e.g., 2.12.2
+    validations:
+      required: true
+
+  - type: input
+    id: java-version
+    attributes:
+      label: Java Version
+      description: What Java version is your server running?
+      placeholder: e.g., Java 21, Java 25
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what's happening...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Player A and Player B are in render range...
+        2. Player B runs /firefly hide...
+        3. Notice that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: The dot should...
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Instead, the dot...
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and Errors
+      description: |
+        Paste any relevant error messages or logs here.
+      render: shell
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: Your config.yml contents (optional but helpful)
+      render: yaml
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might be relevant (screenshots, other plugins, etc.)

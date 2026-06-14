@@ -14,6 +14,13 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+            Compile/test target API. The default build pins the 1.21.x API that
+            Firefly ships against. The `ceiling` profile overrides this with the
+            newest supported API (26.1) to verify forward-compatibility (see
+            profiles below).
+        -->
+        <paper.api.version>1.21.11-R0.1-SNAPSHOT</paper.api.version>
     </properties>
 
     <build>
@@ -29,14 +36,95 @@
                 </configuration>
             </plugin>
             <plugin>
-                <!-- Runs the JUnit 6 test suite during `package`. EnableDynamicAgentLoading
-                     silences Mockito's self-attach warning on JDK 21. -->
+                <!-- Runs the JUnit 6 test suite. @{argLine} is the late-bound property
+                     JaCoCo's prepare-agent sets (the coverage javaagent) — it MUST be
+                     preserved or no jacoco.exec is written and the gate silently skips.
+                     EnableDynamicAgentLoading silences Mockito's self-attach warning. -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.6</version>
                 <configuration>
-                    <argLine>-XX:+EnableDynamicAgentLoading</argLine>
+                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.15</version>
+                <configuration>
+                    <!--
+                        These classes only run inside a live server: WaypointManager
+                        drives netty packet I/O and the Bukkit scheduler through
+                        packetevents, Firefly is the JavaPlugin bootstrap, and
+                        PlayerSessionListener fires on real join/quit events. None can
+                        be exercised on the unit-test classpath (their pure helpers,
+                        e.g. WaypointManager.shouldHide/recolor, are tested directly),
+                        so they are excluded from coverage reporting and the gate.
+                    -->
+                    <excludes>
+                        <exclude>com/mdwgames/firefly/Firefly.class</exclude>
+                        <exclude>com/mdwgames/firefly/locator/WaypointManager.class</exclude>
+                        <exclude>com/mdwgames/firefly/listener/PlayerSessionListener.class</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-check</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>PACKAGE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.60</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.50</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+                CycloneDX SBOM. Default phase is `verify`; CI runs `mvn clean verify`
+                so the SBOM is produced for every build. Output: target/bom.xml,
+                target/bom.json. The release workflow uploads both alongside the JAR.
+            -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>2.9.1</version>
+                <executions>
+                    <execution>
+                        <id>build-sbom</id>
+                        <goals>
+                            <goal>makeBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -48,6 +136,16 @@
                         <goals>
                             <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <relocations>
+                                <!-- Relocate bStats so it can't clash with another plugin's
+                                     shaded copy of the same classes on the server. -->
+                                <relocation>
+                                    <pattern>org.bstats</pattern>
+                                    <shadedPattern>com.mdwgames.firefly.bstats</shadedPattern>
+                                </relocation>
+                            </relocations>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -79,7 +177,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.11-R0.1-SNAPSHOT</version>
+            <version>${paper.api.version}</version>
             <scope>provided</scope>
         </dependency>
 
@@ -99,6 +197,14 @@
                     <artifactId>*</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+
+        <!-- Anonymous usage metrics. Shaded + relocated into the jar (see shade plugin). -->
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bukkit</artifactId>
+            <version>3.2.1</version>
+            <scope>compile</scope>
         </dependency>
 
         <!-- Testing dependencies -->
@@ -127,4 +233,22 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!--
+            Forward-compatibility ("ceiling") check. Activated with `-Pceiling`,
+            this swaps the compile/test target from the shipped 1.21 API to the
+            newest supported API (26.1) so CI can confirm the source still compiles
+            and the tests still pass against the latest Paper API. The default build
+            is unaffected and stays pinned to the 1.21 floor. The ceiling is a
+            SNAPSHOT, so this job may go red when the upstream API moves even without
+            a code change here — that is the signal.
+        -->
+        <profile>
+            <id>ceiling</id>
+            <properties>
+                <paper.api.version>26.1.2-R0.1-SNAPSHOT</paper.api.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>
