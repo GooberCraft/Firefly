@@ -228,7 +228,7 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>7.0.2</version>
+            <version>7.1.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -240,7 +240,7 @@
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
-            <version>9.4.0</version>
+            <version>9.7.0</version>
             <scope>compile</scope>
             <exclusions>
                 <!-- protobuf is only used by the X DevAPI, not classic JDBC; drop the large
