@@ -19,7 +19,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -54,9 +53,14 @@ public final class WaypointManager extends PacketListenerAbstract {
 
     /** Sentinel "applied color" meaning the dot is shown with the vanilla color (no recolor). */
     private static final int VANILLA = Integer.MIN_VALUE;
+    /** Pre-boxed {@link #VANILLA} reused for the dominant no-recolor case to avoid per-put boxing. */
+    private static final Integer VANILLA_BOXED = VANILLA;
 
     private final Plugin plugin;
     private final PreferenceStore store;
+
+    /** Main-thread-only: last-known "is the feature in use" state, for detecting on/off transitions. */
+    private boolean filteringActive;
 
     /** All online player UUIDs — distinguishes player waypoints from mob/armour-stand/datapack ones. */
     private final Set<UUID> onlinePlayers = ConcurrentHashMap.newKeySet();
@@ -82,6 +86,7 @@ public final class WaypointManager extends PacketListenerAbstract {
         Bukkit.getScheduler().runTask(plugin, () -> {
             refreshSnapshot();
             hideExisting();
+            filteringActive = store.hasPreferences();
         });
     }
 
@@ -99,10 +104,25 @@ public final class WaypointManager extends PacketListenerAbstract {
         shownToClient.clear();
     }
 
-    /** Rebuilds the online snapshot and reconciles now — call on the main thread after a change. */
+    /**
+     * Rebuilds the online snapshot and reconciles now — call on the main thread after a preference
+     * change. Handles the on/off edges of the {@link PreferenceStore#hasPreferences() feature-in-use}
+     * gate: when it first turns on, sweeps already-shown dots that should now be hidden; when the last
+     * preference is cleared, the reconcile restores every dot and then the tracking caches are dropped
+     * so the hot path and tick go idle.
+     */
     public void refresh() {
         refreshSnapshot();
+        final boolean now = store.hasPreferences();
+        if (now && !filteringActive) {
+            hideExisting();
+        }
         reconcile();
+        if (!now && filteringActive) {
+            lastSeen.clear();
+            shownToClient.clear();
+        }
+        filteringActive = now;
     }
 
     /** Drops a player's caches when they quit. */
@@ -121,8 +141,8 @@ public final class WaypointManager extends PacketListenerAbstract {
     // ========== Main-thread tick / reconcile ==========
 
     private void tick() {
-        if (lastSeen.isEmpty() && onlinePlayers.size() <= 1) {
-            return; // nothing tracked and nobody to filter for
+        if (!store.hasPreferences()) {
+            return; // feature unused — nothing to filter, recolor, or reconcile
         }
         refreshSnapshot();
         reconcile();
@@ -141,7 +161,9 @@ public final class WaypointManager extends PacketListenerAbstract {
      * and {@code UPDATE} for a color that changed. Prunes offline receivers/transmitters.
      */
     private void reconcile() {
-        for (final UUID receiverId : List.copyOf(lastSeen.keySet())) {
+        // ConcurrentHashMap key-set iteration is weakly consistent and tolerates the removals below
+        // (and concurrent netty inserts), so no defensive copy is needed.
+        for (final UUID receiverId : lastSeen.keySet()) {
             final Player receiver = Bukkit.getPlayer(receiverId);
             if (receiver == null || !receiver.isOnline()) {
                 lastSeen.remove(receiverId);
@@ -155,7 +177,7 @@ public final class WaypointManager extends PacketListenerAbstract {
             final Map<UUID, Integer> shown = shownFor(receiverId);
             final boolean bypassing = store.isBypassing(receiverId);
 
-            for (final UUID transmitterId : List.copyOf(seen.keySet())) {
+            for (final UUID transmitterId : seen.keySet()) {
                 if (!onlinePlayers.contains(transmitterId)) {
                     seen.remove(transmitterId);
                     shown.remove(transmitterId);
@@ -176,10 +198,10 @@ public final class WaypointManager extends PacketListenerAbstract {
                 final int desired = desiredColor(transmitterId);
                 if (shownColor == null) {
                     send(receiver, Operation.TRACK, payload, desired);
-                    shown.put(transmitterId, desired);
+                    shown.put(transmitterId, boxColor(desired));
                 } else if (shownColor != desired) {
                     send(receiver, Operation.UPDATE, payload, desired);
-                    shown.put(transmitterId, desired);
+                    shown.put(transmitterId, boxColor(desired));
                 }
             }
         }
@@ -220,6 +242,11 @@ public final class WaypointManager extends PacketListenerAbstract {
     @Override
     public void onPacketSend(final PacketSendEvent event) {
         if (event.getPacketType() != PacketType.Play.Server.WAYPOINT) {
+            return;
+        }
+        // Fast path for the common case: when nobody has hidden or recolored their dot there is
+        // nothing to filter, so skip decoding the packet and caching its payload entirely.
+        if (!store.hasPreferences()) {
             return;
         }
         if (!(event.getPlayer() instanceof Player receiver)) {
@@ -269,7 +296,7 @@ public final class WaypointManager extends PacketListenerAbstract {
             wrapper.setWaypoint(recolor(wrapper.getWaypoint(), desired));
             event.markForReEncode(true);
         }
-        shownFor(receiverId).put(transmitterId, desired);
+        shownFor(receiverId).put(transmitterId, boxColor(desired));
     }
 
     // ========== Pure helpers (unit-tested) ==========
@@ -298,6 +325,11 @@ public final class WaypointManager extends PacketListenerAbstract {
     private int desiredColor(@NotNull final UUID transmitterId) {
         final Integer color = store.getColor(transmitterId);
         return color == null ? VANILLA : (color & 0xFFFFFF);
+    }
+
+    /** Boxes an applied-color value, reusing the shared instance for the dominant vanilla case. */
+    private static Integer boxColor(final int color) {
+        return color == VANILLA ? VANILLA_BOXED : color;
     }
 
     private static @NotNull TrackedWaypoint syntheticWaypoint(@NotNull final UUID transmitterId) {

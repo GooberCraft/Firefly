@@ -33,6 +33,7 @@ public final class Firefly extends JavaPlugin {
 
         store = new PreferenceStore(new File(getDataFolder(), "playerdata.yml"), getLogger());
         store.load();
+        store.enableAsyncSaves(this);
 
         waypointManager = new WaypointManager(this, store);
         waypointManager.register();

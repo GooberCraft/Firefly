@@ -1,7 +1,9 @@
 package com.mdwgames.firefly.data;
 
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,6 +13,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -29,8 +32,10 @@ import java.util.logging.Logger;
  * <p>The third, <b>bypass</b> (admins currently seeing everyone), is intentionally runtime-only:
  * it is seeded from config when an admin joins and never written to disk.</p>
  *
- * <p>Mutations are write-through — each change persists immediately, since the data set is tiny —
- * with a final {@link #save()} on disable as a backstop.</p>
+ * <p>Mutations persist via {@link #persist()}: once {@link #enableAsyncSaves(Plugin)} has been
+ * called (at runtime), writes are coalesced and flushed on an async thread so a {@code /firefly}
+ * command never blocks the main thread on disk I/O; before that (and in tests) they save inline.
+ * A final synchronous {@link #save()} on disable is the backstop.</p>
  */
 public final class PreferenceStore {
 
@@ -46,9 +51,22 @@ public final class PreferenceStore {
     /** Runtime-only: admins with see-all bypass active this session. Never persisted. */
     private final Set<UUID> bypass = ConcurrentHashMap.newKeySet();
 
+    /** Set once the plugin is enabled; until then (and in unit tests) saves run inline. */
+    private Plugin plugin;
+    /** Coalesces a burst of mutations into a single queued async flush. */
+    private final AtomicBoolean saveQueued = new AtomicBoolean(false);
+
     public PreferenceStore(@NotNull final File file, @NotNull final Logger logger) {
         this.file = file;
         this.logger = logger;
+    }
+
+    /**
+     * Switches persistence to off-thread, coalesced writes. Call once at enable. Until then,
+     * {@link #persist()} saves synchronously (which keeps unit tests deterministic and Bukkit-free).
+     */
+    public void enableAsyncSaves(@NotNull final Plugin plugin) {
+        this.plugin = plugin;
     }
 
     // ========== Persistence ==========
@@ -110,6 +128,32 @@ public final class PreferenceStore {
         }
     }
 
+    /**
+     * Persists after a mutation. Once async saves are enabled, this queues a single off-thread
+     * flush (coalescing a burst of changes) so the calling main thread never blocks on disk I/O;
+     * otherwise it saves inline.
+     */
+    private void persist() {
+        final Plugin p = this.plugin;
+        if (p == null || !p.isEnabled()) {
+            save();
+            return;
+        }
+        // Only schedule when one isn't already pending; the flush reads the latest state, so
+        // mutations arriving before it runs are captured without queuing extra writes.
+        if (saveQueued.compareAndSet(false, true)) {
+            Bukkit.getScheduler().runTaskAsynchronously(p, () -> {
+                saveQueued.set(false);
+                save();
+            });
+        }
+    }
+
+    /** Whether any persisted preference is set — a cheap gate for the packet hot path. */
+    public boolean hasPreferences() {
+        return !hidden.isEmpty() || !colorRgb.isEmpty();
+    }
+
     // ========== Hidden ==========
 
     public boolean isHidden(@NotNull final UUID uuid) {
@@ -120,7 +164,7 @@ public final class PreferenceStore {
     public boolean setHidden(@NotNull final UUID uuid, final boolean value) {
         final boolean changed = value ? hidden.add(uuid) : hidden.remove(uuid);
         if (changed) {
-            save();
+            persist();
         }
         return changed;
     }
@@ -139,14 +183,14 @@ public final class PreferenceStore {
 
     public void setColor(@NotNull final UUID uuid, final int rgb) {
         colorRgb.put(uuid, rgb & 0xFFFFFF);
-        save();
+        persist();
     }
 
     /** Returns {@code true} if a color was set and has now been cleared. */
     public boolean clearColor(@NotNull final UUID uuid) {
         final boolean changed = colorRgb.remove(uuid) != null;
         if (changed) {
-            save();
+            persist();
         }
         return changed;
     }
