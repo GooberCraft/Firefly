@@ -80,13 +80,48 @@ admin-bypass:
   default: false
 ```
 
-`bypass` is per-admin and runtime-only: this option only sets the value each admin starts a session
-with. Admins flip it live with `/firefly bypass`.
+`admin-bypass.default` only applies to admins who have never run `/firefly bypass` — an admin's
+explicit choice is **persisted** and wins on every future login. When an admin logs in with bypass
+active, Firefly reminds them (with a hint to `/firefly bypass off`).
 
-### Persistence
+### Storage
 
-Hide state and chosen colors are stored in `plugins/Firefly/playerdata.yml`, keyed by player UUID,
-and survive relogs and restarts. Bypass is intentionally **not** persisted.
+Hide state, colors, and each admin's bypass choice are persisted per player UUID and survive relogs
+and restarts. Choose the backend in `config.yml`:
+
+```yaml
+storage:
+  type: yaml          # yaml (default) | h2 | mysql
+  h2:
+    file: players     # embedded SQL DB at plugins/Firefly/players.mv.db
+  mysql:
+    host: localhost
+    port: 3306
+    database: firefly
+    username: firefly
+    password: ""      # literal, or ${ENV_VAR} to read from the environment (recommended)
+    ssl: preferred    # disabled | preferred | required | verify-ca | verify-identity
+    pool:                 # one background thread does all DB I/O, so a tiny fixed pool is optimal
+      maximum-pool-size: 2
+      minimum-idle: 2
+      connection-timeout-ms: 10000
+      max-lifetime-ms: 1800000
+      keepalive-ms: 0
+```
+
+- **yaml** — flat `playerdata.yml`, zero setup.
+- **h2** — embedded, file-based SQL (no external server). Runs in MySQL-compatibility mode.
+- **mysql** — external server, pooled with HikariCP; share preferences across a network of servers.
+
+All database I/O runs on a dedicated background thread (never the main thread). Switching backends
+**does not migrate** existing data. If a database can't be reached, Firefly logs the error and falls
+back to YAML so the plugin still works. The H2/MySQL/HikariCP drivers are shaded into the jar
+(~+10 MB).
+
+**Security notes:** all queries are parameterized; the H2 file name is sanitized (no URL-injection);
+MySQL connects with TLS per `ssl`, `allowPublicKeyRetrieval=false`, and prepared-statement caching;
+keep the password in an environment variable via `${ENV_VAR}`; and grant the MySQL user only
+`SELECT/INSERT/UPDATE/DELETE` on `firefly_players` (plus `CREATE` once, or pre-create the table).
 
 ## How it works
 

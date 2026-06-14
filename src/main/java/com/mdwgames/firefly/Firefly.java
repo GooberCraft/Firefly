@@ -2,14 +2,16 @@ package com.mdwgames.firefly;
 
 import com.mdwgames.firefly.command.FireflyCommand;
 import com.mdwgames.firefly.data.PreferenceStore;
+import com.mdwgames.firefly.data.storage.Storage;
+import com.mdwgames.firefly.data.storage.StorageFactory;
 import com.mdwgames.firefly.listener.PlayerSessionListener;
 import com.mdwgames.firefly.locator.WaypointManager;
-import io.github.retrooper.packetevents.util.folia.FoliaScheduler;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Firefly — controls which dots appear on the 1.21.6+ locator bar. Players hide/recolor their own
@@ -18,6 +20,7 @@ import java.io.File;
  */
 public final class Firefly extends JavaPlugin {
 
+    private ExecutorService storageWorker;
     private PreferenceStore store;
     private WaypointManager waypointManager;
 
@@ -32,10 +35,14 @@ public final class Firefly extends JavaPlugin {
 
         saveDefaultConfig();
 
-        store = new PreferenceStore(new File(getDataFolder(), "playerdata.yml"), getLogger());
-        store.load();
-        // Coalesced off-thread saves via packetevents' async scheduler (Folia-aware, Bukkit on Paper).
-        store.enableAsyncSaves(task -> FoliaScheduler.getAsyncScheduler().runNow(this, o -> task.run()));
+        // Single dedicated thread for all storage I/O — keeps JDBC/file work off the main thread.
+        storageWorker = Executors.newSingleThreadExecutor(r -> {
+            final Thread t = new Thread(r, "Firefly-Storage");
+            t.setDaemon(true);
+            return t;
+        });
+        final Storage storage = StorageFactory.create(this, getConfig());
+        store = new PreferenceStore(storage, storageWorker, getLogger());
 
         waypointManager = new WaypointManager(this, store);
         waypointManager.register();
@@ -53,6 +60,9 @@ public final class Firefly extends JavaPlugin {
             getLogger().warning("Failed to register the /firefly command — is it declared in plugin.yml?");
         }
 
+        // Init + load off-thread; reconcile already-online players once the data has landed.
+        store.load(() -> waypointManager.scheduleRefresh());
+
         final int pluginId = 31993;
         new Metrics(this, pluginId);
 
@@ -65,7 +75,7 @@ public final class Firefly extends JavaPlugin {
             waypointManager.shutdown();
         }
         if (store != null) {
-            store.save();
+            store.close(); // final flush + close pool + shut down the storage worker
         }
     }
 

@@ -1,12 +1,14 @@
 package com.mdwgames.firefly.data;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
-import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,88 +21,127 @@ class PreferenceStoreTest {
 
     private static final Logger LOG = Logger.getLogger("PreferenceStoreTest");
 
-    private PreferenceStore newStore(final Path dir) {
-        return new PreferenceStore(new File(dir.toFile(), "playerdata.yml"), LOG);
+    private FakeStorage storage;
+    private ExecutorService worker;
+    private PreferenceStore store;
+
+    @BeforeEach
+    void setUp() {
+        storage = new FakeStorage();
+        worker = Executors.newSingleThreadExecutor();
+        store = new PreferenceStore(storage, worker, LOG);
+    }
+
+    @AfterEach
+    void tearDown() throws InterruptedException {
+        worker.shutdownNow();
+        worker.awaitTermination(2, TimeUnit.SECONDS);
+    }
+
+    /** Barrier: waits for all previously-submitted worker tasks (incl. the coalesced flush). */
+    private void sync() throws Exception {
+        worker.submit(() -> { }).get(2, TimeUnit.SECONDS);
     }
 
     @Test
-    @DisplayName("set/get hidden tracks changes and reports whether the value changed")
-    void hidden(@TempDir final Path dir) {
-        final PreferenceStore store = newStore(dir);
+    @DisplayName("hidden state is tracked in memory and persisted")
+    void hidden() throws Exception {
         final UUID id = UUID.randomUUID();
-
-        assertFalse(store.isHidden(id));
-        assertTrue(store.setHidden(id, true));   // changed
+        assertTrue(store.setHidden(id, true));
         assertTrue(store.isHidden(id));
-        assertFalse(store.setHidden(id, true));   // no-op
-        assertTrue(store.setHidden(id, false));   // changed back
-        assertFalse(store.isHidden(id));
+        assertFalse(store.setHidden(id, true)); // no change
+        sync();
+        assertTrue(storage.data.get(id).hidden());
+
+        assertTrue(store.setHidden(id, false)); // back to default -> row removed
+        sync();
+        assertFalse(storage.data.containsKey(id));
     }
 
     @Test
-    @DisplayName("set/clear color")
-    void color(@TempDir final Path dir) {
-        final PreferenceStore store = newStore(dir);
+    @DisplayName("color is stored and cleared")
+    void color() throws Exception {
         final UUID id = UUID.randomUUID();
-
-        assertNull(store.getColor(id));
         store.setColor(id, 0xFF8800);
         assertEquals(0xFF8800, store.getColor(id));
+        sync();
+        assertEquals(0xFF8800, storage.data.get(id).colorRgb());
+
         assertTrue(store.clearColor(id));
         assertNull(store.getColor(id));
-        assertFalse(store.clearColor(id));
+        sync();
+        assertFalse(storage.data.containsKey(id));
     }
 
     @Test
-    @DisplayName("hidden and color persist across a save/load round-trip")
-    void roundTrip(@TempDir final Path dir) {
+    @DisplayName("bypass is persisted; seedBypass honors persisted choice over the config default")
+    void bypassPersistAndSeed() throws Exception {
+        final UUID id = UUID.randomUUID();
+
+        store.setBypass(id, true);
+        assertTrue(store.isBypassing(id));
+        sync();
+        assertEquals(Boolean.TRUE, storage.data.get(id).bypass());
+
+        // Persisted true wins even when the config default is false.
+        assertTrue(store.seedBypass(id, false));
+        assertTrue(store.isBypassing(id));
+
+        // Explicit false persists (distinct from "unset").
+        store.setBypass(id, false);
+        sync();
+        assertEquals(Boolean.FALSE, storage.data.get(id).bypass());
+        assertFalse(store.seedBypass(id, true)); // persisted false wins over default true
+    }
+
+    @Test
+    @DisplayName("seedBypass uses the config default for a never-set admin and does not persist it")
+    void seedBypassDefault() throws Exception {
+        final UUID id = UUID.randomUUID();
+        assertTrue(store.seedBypass(id, true));   // no record -> default
+        assertFalse(store.seedBypass(id, false));
+        sync();
+        assertFalse(storage.data.containsKey(id)); // seeding never writes a row
+    }
+
+    @Test
+    @DisplayName("clearBypass only affects the runtime set")
+    void clearBypass() {
+        final UUID id = UUID.randomUUID();
+        store.seedBypass(id, true);
+        assertTrue(store.isBypassing(id));
+        store.clearBypass(id);
+        assertFalse(store.isBypassing(id));
+    }
+
+    @Test
+    @DisplayName("load populates in-memory state from storage and runs the ready callback")
+    void load() throws Exception {
         final UUID hiddenId = UUID.randomUUID();
         final UUID coloredId = UUID.randomUUID();
+        final UUID bypassId = UUID.randomUUID();
+        storage.data.put(hiddenId, new PlayerPreferences(true, null, null));
+        storage.data.put(coloredId, new PlayerPreferences(false, 0x123456, null));
+        storage.data.put(bypassId, new PlayerPreferences(false, null, Boolean.TRUE));
 
-        final PreferenceStore writer = newStore(dir);
-        writer.setHidden(hiddenId, true);
-        writer.setColor(coloredId, 0x123456);
-        writer.save();
+        final boolean[] ready = {false};
+        store.load(() -> ready[0] = true);
+        sync();
 
-        final PreferenceStore reader = newStore(dir);
-        reader.load();
-        assertTrue(reader.isHidden(hiddenId));
-        assertEquals(0x123456, reader.getColor(coloredId));
-        assertFalse(reader.isHidden(coloredId));
+        assertTrue(ready[0]);
+        assertTrue(store.isHidden(hiddenId));
+        assertEquals(0x123456, store.getColor(coloredId));
+        assertTrue(store.seedBypass(bypassId, false)); // loaded bypassPref=true wins
     }
 
     @Test
-    @DisplayName("hiddenPlayers returns a snapshot of all hidden UUIDs")
-    void hiddenPlayersSnapshot(@TempDir final Path dir) {
-        final PreferenceStore store = newStore(dir);
-        final UUID a = UUID.randomUUID();
-        final UUID b = UUID.randomUUID();
-        store.setHidden(a, true);
-        store.setHidden(b, true);
-
-        assertEquals(2, store.hiddenPlayers().size());
-        assertTrue(store.hiddenPlayers().contains(a));
-        // snapshot is a copy — mutating it doesn't affect the store
-        store.hiddenPlayers().clear();
-        assertEquals(2, store.hiddenPlayers().size());
-    }
-
-    @Test
-    @DisplayName("bypass is runtime-only and never persisted")
-    void bypassNotPersisted(@TempDir final Path dir) {
+    @DisplayName("hasPreferences reflects hidden/color but not bypass")
+    void hasPreferences() {
         final UUID id = UUID.randomUUID();
-        final PreferenceStore writer = newStore(dir);
-        assertTrue(store(writer, id));
-        writer.save();
-
-        final PreferenceStore reader = newStore(dir);
-        reader.load();
-        assertFalse(reader.isBypassing(id));
-    }
-
-    private boolean store(final PreferenceStore store, final UUID id) {
-        final boolean changed = store.setBypass(id, true);
-        assertTrue(store.isBypassing(id));
-        return changed;
+        assertFalse(store.hasPreferences());
+        store.setBypass(id, true);
+        assertFalse(store.hasPreferences()); // bypass alone doesn't arm the hot path
+        store.setHidden(id, true);
+        assertTrue(store.hasPreferences());
     }
 }

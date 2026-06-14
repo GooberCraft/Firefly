@@ -1,6 +1,8 @@
 package com.mdwgames.firefly.command;
 
 import com.mdwgames.firefly.data.PreferenceStore;
+import com.mdwgames.firefly.data.storage.Storage;
+import com.mdwgames.firefly.data.storage.YamlStorage;
 import com.mdwgames.firefly.locator.WaypointManager;
 import org.bukkit.command.Command;
 import org.bukkit.command.ConsoleCommandSender;
@@ -18,6 +20,9 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,6 +36,7 @@ class FireflyCommandTest {
 
     private ServerMock server;
     private Plugin plugin;
+    private ExecutorService worker;
     private PreferenceStore store;
     private FireflyCommand cmd;
     private Command bukkitCmd;
@@ -39,14 +45,18 @@ class FireflyCommandTest {
     void setUp(@TempDir final Path dir) {
         server = MockBukkit.mock();
         plugin = MockBukkit.createMockPlugin("Firefly");
-        store = new PreferenceStore(new File(dir.toFile(), "playerdata.yml"), Logger.getLogger("test"));
+        worker = Executors.newSingleThreadExecutor();
+        final Storage storage = new YamlStorage(new File(dir.toFile(), "playerdata.yml"), Logger.getLogger("test"));
+        store = new PreferenceStore(storage, worker, Logger.getLogger("test"));
         final WaypointManager manager = new WaypointManager(plugin, store);
         cmd = new FireflyCommand(plugin, store, manager);
         bukkitCmd = mock(Command.class);
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws InterruptedException {
+        worker.shutdownNow();
+        worker.awaitTermination(2, TimeUnit.SECONDS);
         MockBukkit.unmock();
     }
 

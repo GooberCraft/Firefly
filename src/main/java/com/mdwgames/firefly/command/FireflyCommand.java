@@ -179,8 +179,9 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             return;
         }
         plugin.reloadConfig();
-        store.load();
-        manager.scheduleRefresh();
+        // Re-read player data from the current backend, then reconcile once it lands. (Switching
+        // storage.type itself requires a restart.)
+        store.load(manager::scheduleRefresh);
         sender.sendMessage(PREFIX + ChatColor.GREEN + "Firefly configuration and player data reloaded.");
     }
 

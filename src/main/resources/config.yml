@@ -10,4 +10,40 @@ admin-bypass:
   #
   #   false  - admins respect player hiding until they opt in (recommended)
   #   true   - admins see everyone by default
+  # An admin's explicit "/firefly bypass <on|off>" choice is persisted and overrides this default;
+  # this value applies only to admins who have never set it.
   default: false
+
+# ============================================================================
+#  Storage — where hide/color/bypass preferences are saved
+# ============================================================================
+storage:
+  # yaml  - flat file in this folder (playerdata.yml). Default, zero setup.
+  # h2    - embedded SQL database, also in this folder. No external server.
+  # mysql - external MySQL server (shared across a network of servers).
+  # Switching backends does NOT migrate existing data.
+  type: yaml
+
+  h2:
+    # Database file name (stored as <name>.mv.db in the plugin folder). Must be a simple
+    # name — letters, digits, '.', '_', '-' only (this is enforced for security).
+    file: players
+
+  mysql:
+    host: localhost
+    port: 3306
+    database: firefly
+    username: firefly
+    # The password may be given literally, or as ${ENV_VAR} to read it from an environment
+    # variable instead of storing the secret in this file (recommended).
+    password: ""
+    # TLS mode: disabled | preferred | required | verify-ca | verify-identity
+    ssl: preferred
+    pool:
+      # Firefly reads/writes the database from a single background thread, so it only ever uses one
+      # connection at a time — a small fixed pool is optimal; raising these gains nothing.
+      maximum-pool-size: 2
+      minimum-idle: 2
+      connection-timeout-ms: 10000
+      max-lifetime-ms: 1800000
+      keepalive-ms: 0
