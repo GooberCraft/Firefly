@@ -1,0 +1,25 @@
+name: Firefly
+description: $description
+version: '${version}'
+
+main: com.mdwgames.firefly.Firefly
+api-version: '1.21'
+
+authors: [ MDWGames ]
+
+# packetevents must be installed on the server; Firefly drives the locator bar through it.
+depend: [ packetevents ]
+
+commands:
+  firefly:
+    description: Control your locator-bar dot (hide/show and color) and administer the locator bar.
+    usage: /firefly <hide|show|toggle|color|bypass|showhidden|reload>
+    aliases: [ ff ]
+
+permissions:
+  firefly.use:
+    description: Allows a player to hide/show and recolor their own locator-bar dot.
+    default: true
+  firefly.admin:
+    description: Allows bypassing player hiding, listing hidden players, and reloading the config.
+    default: op

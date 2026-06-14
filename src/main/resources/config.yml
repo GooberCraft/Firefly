@@ -1,0 +1,13 @@
+# ============================================================================
+#  Firefly configuration
+# ============================================================================
+
+admin-bypass:
+  # When an admin (firefly.admin) joins, should "see-all" bypass start enabled?
+  # With bypass on, an admin sees every player's locator-bar dot, including the
+  # dots of players who ran "/firefly hide". Admins can flip this at runtime with
+  # "/firefly bypass <on|off>"; this only sets the value they start each session with.
+  #
+  #   false  - admins respect player hiding until they opt in (recommended)
+  #   true   - admins see everyone by default
+  default: false
