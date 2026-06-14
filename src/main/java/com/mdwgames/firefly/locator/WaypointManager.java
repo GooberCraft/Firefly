@@ -13,10 +13,11 @@ import com.github.retrooper.packetevents.util.Either;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerWaypoint;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerWaypoint.Operation;
 import com.mdwgames.firefly.data.PreferenceStore;
+import io.github.retrooper.packetevents.util.folia.FoliaScheduler;
+import io.github.retrooper.packetevents.util.folia.TaskWrapper;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -46,8 +47,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p><b>Threading:</b> {@link #onPacketSend} runs on netty I/O threads — it only reads the concurrent
  * snapshots and the {@link PreferenceStore}, mutates concurrent caches, and edits the in-flight
  * packet; it never calls the Bukkit API or sends packets. All snapshot rebuilds, reconciliation, and
- * packet <em>sends</em> happen on the main thread ({@link #tick()} each second and {@link #refresh()}
- * on demand from commands).</p>
+ * packet <em>sends</em> run on a single scheduler thread — packetevents' {@link FoliaScheduler}
+ * global region scheduler (the main thread on Paper/Spigot) — driven by {@link #tick()} each second
+ * and {@link #scheduleRefresh()} on demand from commands. Firefly only touches player UUIDs, the
+ * store, cached payloads, and packet sends, so this is Folia-safe (no region-locked world state).</p>
  */
 public final class WaypointManager extends PacketListenerAbstract {
 
@@ -69,7 +72,7 @@ public final class WaypointManager extends PacketListenerAbstract {
     /** receiver UUID → (transmitter UUID → applied color, or {@link #VANILLA}). Our model of the client. */
     private final Map<UUID, Map<UUID, Integer>> shownToClient = new ConcurrentHashMap<>();
 
-    private BukkitTask tickTask;
+    private TaskWrapper tickTask;
 
     public WaypointManager(@NotNull final Plugin plugin, @NotNull final PreferenceStore store) {
         super(PacketListenerPriority.NORMAL);
@@ -77,13 +80,17 @@ public final class WaypointManager extends PacketListenerAbstract {
         this.store = store;
     }
 
-    /** Registers the packet listener and starts the per-second reconcile tick. */
+    /**
+     * Registers the packet listener and starts the per-second reconcile tick. Scheduling goes
+     * through packetevents' {@link FoliaScheduler}: the global region scheduler on Folia, the
+     * Bukkit scheduler on Paper/Spigot — so all reconcile work runs on one thread on either.
+     */
     public void register() {
         PacketEvents.getAPI().getEventManager().registerListener(this);
-        this.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+        this.tickTask = FoliaScheduler.getGlobalRegionScheduler().runAtFixedRate(plugin, o -> tick(), 20L, 20L);
         // Cover a /reload: players may already be carrying now-hidden dots from before. Defer a tick
         // so the online-player set is settled, then sweep them off.
-        Bukkit.getScheduler().runTask(plugin, () -> {
+        FoliaScheduler.getGlobalRegionScheduler().run(plugin, o -> {
             refreshSnapshot();
             hideExisting();
             filteringActive = store.hasPreferences();
@@ -105,11 +112,22 @@ public final class WaypointManager extends PacketListenerAbstract {
     }
 
     /**
-     * Rebuilds the online snapshot and reconciles now — call on the main thread after a preference
-     * change. Handles the on/off edges of the {@link PreferenceStore#hasPreferences() feature-in-use}
-     * gate: when it first turns on, sweeps already-shown dots that should now be hidden; when the last
-     * preference is cleared, the reconcile restores every dot and then the tracking caches are dropped
-     * so the hot path and tick go idle.
+     * Marshals a {@link #refresh()} onto the global region scheduler. Commands call this (not
+     * {@link #refresh()} directly) so reconcile always runs on the same thread as the tick — on
+     * Folia a command runs on its sender's region thread, which would otherwise race the global
+     * tick; on Paper this just defers to the next main-thread tick.
+     */
+    public void scheduleRefresh() {
+        FoliaScheduler.getGlobalRegionScheduler().run(plugin, o -> refresh());
+    }
+
+    /**
+     * Rebuilds the online snapshot and reconciles now. Runs on the global region scheduler thread
+     * (via {@link #scheduleRefresh()} or the tick) — never call it directly off that thread. Handles
+     * the on/off edges of the {@link PreferenceStore#hasPreferences() feature-in-use} gate: when it
+     * first turns on, sweeps already-shown dots that should now be hidden; when the last preference is
+     * cleared, the reconcile restores every dot and then the tracking caches are dropped so the hot
+     * path and tick go idle.
      */
     public void refresh() {
         refreshSnapshot();
@@ -184,6 +202,9 @@ public final class WaypointManager extends PacketListenerAbstract {
                     continue;
                 }
                 final TrackedWaypoint payload = seen.get(transmitterId);
+                if (payload == null) {
+                    continue; // removed by the netty thread (UNTRACK) between the snapshot and now
+                }
                 final boolean hide = shouldHide(receiverId, transmitterId,
                         store.isHidden(transmitterId), bypassing);
                 final Integer shownColor = shown.get(transmitterId); // null → not currently shown

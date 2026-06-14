@@ -20,8 +20,8 @@ locator control, so packetevents is a hard dependency.
 
 ## Requirements
 
-- A **Paper or Spigot 1.21.6+** server (the locator bar exists from 1.21.6 onward; Firefly also
-  targets the Minecraft 26.1 waypoint update).
+- A **Paper, Spigot, or Folia 1.21.6+** server (the locator bar exists from 1.21.6 onward; Firefly
+  also targets the Minecraft 26.1 waypoint update). Folia is fully supported.
 - The **[packetevents](https://www.spigotmc.org/resources/packetevents.80279/)** plugin installed in
   `plugins/`. Firefly will refuse to enable without it.
 - Clients on 1.21.6+ to actually render the locator bar.

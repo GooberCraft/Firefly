@@ -1,9 +1,7 @@
 package com.mdwgames.firefly.data;
 
-import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -32,12 +30,18 @@ import java.util.logging.Logger;
  * <p>The third, <b>bypass</b> (admins currently seeing everyone), is intentionally runtime-only:
  * it is seeded from config when an admin joins and never written to disk.</p>
  *
- * <p>Mutations persist via {@link #persist()}: once {@link #enableAsyncSaves(Plugin)} has been
- * called (at runtime), writes are coalesced and flushed on an async thread so a {@code /firefly}
- * command never blocks the main thread on disk I/O; before that (and in tests) they save inline.
- * A final synchronous {@link #save()} on disable is the backstop.</p>
+ * <p>Mutations persist via {@link #persist()}: once {@link #enableAsyncSaves(AsyncSaver)} has been
+ * called (at runtime), writes are coalesced and flushed off-thread so a {@code /firefly} command
+ * never blocks the calling thread on disk I/O; before that (and in tests) they save inline. A final
+ * synchronous {@link #save()} on disable is the backstop.</p>
  */
 public final class PreferenceStore {
+
+    /** Runs a save task off the calling thread. Injected so this class stays Bukkit/Folia-free. */
+    @FunctionalInterface
+    public interface AsyncSaver {
+        void run(@NotNull Runnable task);
+    }
 
     private static final String PLAYERS = "players";
     private static final String HIDDEN = "hidden";
@@ -51,8 +55,8 @@ public final class PreferenceStore {
     /** Runtime-only: admins with see-all bypass active this session. Never persisted. */
     private final Set<UUID> bypass = ConcurrentHashMap.newKeySet();
 
-    /** Set once the plugin is enabled; until then (and in unit tests) saves run inline. */
-    private Plugin plugin;
+    /** Set once at enable; until then (and in unit tests) saves run inline. */
+    private AsyncSaver saver;
     /** Coalesces a burst of mutations into a single queued async flush. */
     private final AtomicBoolean saveQueued = new AtomicBoolean(false);
 
@@ -62,11 +66,12 @@ public final class PreferenceStore {
     }
 
     /**
-     * Switches persistence to off-thread, coalesced writes. Call once at enable. Until then,
-     * {@link #persist()} saves synchronously (which keeps unit tests deterministic and Bukkit-free).
+     * Switches persistence to off-thread, coalesced writes via the given dispatcher (e.g. backed by
+     * packetevents' async scheduler). Call once at enable. Until then, {@link #persist()} saves
+     * synchronously (which keeps unit tests deterministic and Bukkit-free).
      */
-    public void enableAsyncSaves(@NotNull final Plugin plugin) {
-        this.plugin = plugin;
+    public void enableAsyncSaves(@NotNull final AsyncSaver saver) {
+        this.saver = saver;
     }
 
     // ========== Persistence ==========
@@ -134,15 +139,15 @@ public final class PreferenceStore {
      * otherwise it saves inline.
      */
     private void persist() {
-        final Plugin p = this.plugin;
-        if (p == null || !p.isEnabled()) {
+        final AsyncSaver s = this.saver;
+        if (s == null) {
             save();
             return;
         }
         // Only schedule when one isn't already pending; the flush reads the latest state, so
         // mutations arriving before it runs are captured without queuing extra writes.
         if (saveQueued.compareAndSet(false, true)) {
-            Bukkit.getScheduler().runTaskAsynchronously(p, () -> {
+            s.run(() -> {
                 saveQueued.set(false);
                 save();
             });

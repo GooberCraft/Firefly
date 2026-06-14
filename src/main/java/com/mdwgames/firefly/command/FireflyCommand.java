@@ -24,8 +24,8 @@ import java.util.UUID;
 /**
  * Handles {@code /firefly} (alias {@code /ff}). Self-service subcommands (hide/show/toggle/color)
  * are gated by {@code firefly.use}; admin subcommands (bypass/showhidden/reload) by
- * {@code firefly.admin}. Each preference change calls {@link WaypointManager#refresh()} so it applies
- * to the locator bar immediately.
+ * {@code firefly.admin}. Each preference change calls {@link WaypointManager#scheduleRefresh()} so it
+ * applies to the locator bar.
  */
 public final class FireflyCommand implements CommandExecutor, TabCompleter {
 
@@ -79,7 +79,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             return;
         }
         store.setHidden(player.getUniqueId(), hide);
-        manager.refresh();
+        manager.scheduleRefresh();
         if (hide) {
             sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot is now hidden from other players.");
         } else {
@@ -94,7 +94,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
         }
         final boolean nowHidden = !store.isHidden(player.getUniqueId());
         store.setHidden(player.getUniqueId(), nowHidden);
-        manager.refresh();
+        manager.scheduleRefresh();
         sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot is now "
                 + (nowHidden ? "hidden." : "visible."));
     }
@@ -110,7 +110,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
         }
         if (args[1].equalsIgnoreCase("reset") || args[1].equalsIgnoreCase("clear")) {
             store.clearColor(player.getUniqueId());
-            manager.refresh();
+            manager.scheduleRefresh();
             sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot color was reset to default.");
             return;
         }
@@ -121,7 +121,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             return;
         }
         store.setColor(player.getUniqueId(), parsed.getAsInt());
-        manager.refresh();
+        manager.scheduleRefresh();
         sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot color is now "
                 + ColorNames.format(parsed.getAsInt()) + ".");
     }
@@ -146,7 +146,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             return;
         }
         store.setBypass(player.getUniqueId(), target);
-        manager.refresh();
+        manager.scheduleRefresh();
         sender.sendMessage(PREFIX + ChatColor.GREEN + "See-all bypass is now " + (target ? "ON" : "OFF")
                 + ChatColor.GREEN + ". You " + (target ? "now see" : "no longer see")
                 + " players who hid their dot.");
@@ -180,7 +180,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
         }
         plugin.reloadConfig();
         store.load();
-        manager.refresh();
+        manager.scheduleRefresh();
         sender.sendMessage(PREFIX + ChatColor.GREEN + "Firefly configuration and player data reloaded.");
     }
 

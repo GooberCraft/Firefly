@@ -4,6 +4,7 @@ import com.mdwgames.firefly.command.FireflyCommand;
 import com.mdwgames.firefly.data.PreferenceStore;
 import com.mdwgames.firefly.listener.PlayerSessionListener;
 import com.mdwgames.firefly.locator.WaypointManager;
+import io.github.retrooper.packetevents.util.folia.FoliaScheduler;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -33,7 +34,8 @@ public final class Firefly extends JavaPlugin {
 
         store = new PreferenceStore(new File(getDataFolder(), "playerdata.yml"), getLogger());
         store.load();
-        store.enableAsyncSaves(this);
+        // Coalesced off-thread saves via packetevents' async scheduler (Folia-aware, Bukkit on Paper).
+        store.enableAsyncSaves(task -> FoliaScheduler.getAsyncScheduler().runNow(this, o -> task.run()));
 
         waypointManager = new WaypointManager(this, store);
         waypointManager.register();
