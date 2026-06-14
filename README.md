@@ -102,7 +102,10 @@ The locator bar is driven by one `WAYPOINT` packet per tracked player, with `TRA
   preference changes — no waiting for the player to move out of range.
 
 Packet interception runs on netty I/O threads (read-only against concurrent state); all packet
-*sends* and reconciliation run on the main thread.
+*sends* and reconciliation run on a single scheduler thread via packetevents' cross-platform
+`FoliaScheduler` — the global region scheduler on **Folia**, the main thread on Paper/Spigot. Because
+Firefly only ever touches player UUIDs, the in-memory store, cached payloads, and packet sends (never
+region-locked world or entity state), it runs safely on Folia.
 
 ## Building
 
