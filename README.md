@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/Firefly_logo.png" alt="Firefly logo" width="400">
+</p>
+
 # Firefly
 
 [![Build Status](https://github.com/GooberCraft/Firefly/workflows/Build/badge.svg)](https://github.com/GooberCraft/Firefly/actions)
