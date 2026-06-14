@@ -1,5 +1,10 @@
 # Firefly
 
+[![Build Status](https://github.com/GooberCraft/Firefly/workflows/Build/badge.svg)](https://github.com/GooberCraft/Firefly/actions)
+[![CodeFactor](https://www.codefactor.io/repository/github/goobercraft/firefly/badge)](https://www.codefactor.io/repository/github/goobercraft/firefly)
+[![GitHub release](https://img.shields.io/github/v/release/GooberCraft/Firefly)](https://github.com/GooberCraft/Firefly/releases)
+[![bStats Servers](https://img.shields.io/bstats/servers/31993)](https://bstats.org/plugin/bukkit/Firefly/31993)
+
 Firefly gives players control over the **locator bar** — the on-screen bar added in Minecraft
 1.21.6+ that shows other players' positions as colored dots/waypoints. Players can hide their own
 dot from everyone else and recolor it; admins can bypass hiding to see everyone, list who is
