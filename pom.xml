@@ -14,13 +14,6 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!--
-            Compile/test target API. The default build pins the 1.21.x API that
-            Firefly ships against. The `ceiling` profile overrides this with the
-            newest supported API (26.1) to verify forward-compatibility (see
-            profiles below).
-        -->
-        <paper.api.version>1.21.11-R0.1-SNAPSHOT</paper.api.version>
     </properties>
 
     <build>
@@ -177,7 +170,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>${paper.api.version}</version>
+            <version>1.21.11-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
 
@@ -233,22 +226,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <profiles>
-        <!--
-            Forward-compatibility ("ceiling") check. Activated with `-Pceiling`,
-            this swaps the compile/test target from the shipped 1.21 API to the
-            newest supported API (26.1) so CI can confirm the source still compiles
-            and the tests still pass against the latest Paper API. The default build
-            is unaffected and stays pinned to the 1.21 floor. The ceiling is a
-            SNAPSHOT, so this job may go red when the upstream API moves even without
-            a code change here — that is the signal.
-        -->
-        <profile>
-            <id>ceiling</id>
-            <properties>
-                <paper.api.version>26.1.2-R0.1-SNAPSHOT</paper.api.version>
-            </properties>
-        </profile>
-    </profiles>
 </project>

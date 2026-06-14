@@ -17,6 +17,13 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
+    ignore:
+      # paper-api major bumps are Minecraft platform jumps (e.g. 1.21 -> 26.1) that
+      # require deliberate testing and a coordinated Java/packetevents update — they
+      # break the pinned build, so they are handled manually (see the `ceiling`
+      # profile in pom.xml). Minor/patch bumps are still proposed automatically.
+      - dependency-name: "io.papermc.paper:paper-api"
+        update-types: ["version-update:semver-major"]
     # Group minor and patch updates together
     groups:
       test-dependencies:

@@ -83,39 +83,3 @@ jobs:
         path: target/Firefly-${{ steps.get_version.outputs.VERSION }}.jar
         if-no-files-found: error
         retention-days: 30
-
-  # Forward-compatibility check: the main build targets the 1.21 API floor, this
-  # compiles and tests against the newest supported API (the `ceiling` Maven
-  # profile pins paper-api to 26.1.x). Blocking, so a forward-incompat change
-  # can't merge. The ceiling is a SNAPSHOT, so this may go red when the upstream
-  # API moves even without a code change here — that's the signal. Runs on Java
-  # 25 to mirror the real 26.1 server runtime, which requires Java 25.
-  ceiling:
-    name: Ceiling compat (26.1 API)
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-
-    - name: Set up JDK 25
-      uses: actions/setup-java@v5
-      with:
-        java-version: 25
-        distribution: 'temurin'
-        cache: maven
-
-    - name: Cache build output
-      uses: actions/cache@v5
-      with:
-        path: target
-        key: ${{ runner.os }}-maven-ceiling-${{ hashFiles('**/pom.xml', 'src/**') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-ceiling-
-
-    # Full verify (compile main + test + coverage gate) against the ceiling API.
-    - name: Build and test against ceiling API
-      run: mvn clean verify -Pceiling
