@@ -15,6 +15,12 @@ jobs:
     name: Mark Stale Issues and PRs
     runs-on: ubuntu-latest
     steps:
+      # Network + runtime security monitoring for the runner (audit: observe-only, no egress blocked).
+      - name: Harden runner
+        uses: step-security/harden-runner@v2.19.4
+        with:
+          egress-policy: audit
+
       - name: Stale Issue and PR Management
         uses: actions/stale@v10
         with:
