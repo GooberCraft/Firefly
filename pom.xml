@@ -162,6 +162,20 @@
                                      MySQL drivers from the jdbc: URL — no hardcoded driver class. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- Drop bundled-dependency metadata that conflicts in an
+                                             uber-jar: module descriptors (break shading) and any
+                                             dependency signatures (invalid once repackaged). -->
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>

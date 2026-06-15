@@ -16,6 +16,9 @@ import org.jetbrains.annotations.NotNull;
  * default) and reminds them if it's active; drops a player's cached locator-bar state on quit so
  * the maps don't leak.
  */
+// ChatColor is deprecated on Paper but used deliberately for cross-platform (Spigot) message
+// coloring — see FireflyCommand. Suppress the deprecation noise.
+@SuppressWarnings("deprecation")
 public final class PlayerSessionListener implements Listener {
 
     private final PreferenceStore store;

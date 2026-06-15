@@ -27,6 +27,9 @@ import java.util.UUID;
  * {@code firefly.admin}. Each preference change calls {@link WaypointManager#scheduleRefresh()} so it
  * applies to the locator bar.
  */
+// ChatColor is deprecated on Paper (which prefers Adventure), but Adventure is Paper-only; we use
+// ChatColor deliberately so messages also work on Spigot. Suppress the resulting deprecation noise.
+@SuppressWarnings("deprecation")
 public final class FireflyCommand implements CommandExecutor, TabCompleter {
 
     public static final String PERM_USE = "firefly.use";
