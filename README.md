@@ -30,7 +30,8 @@ locator control, so packetevents is a hard dependency.
 
 1. Install the **packetevents** plugin in your server's `plugins/` folder.
 2. Drop `Firefly-1.0.jar` (from `target/` after building) into `plugins/`.
-3. Start the server. Firefly creates `plugins/Firefly/config.yml` and `plugins/Firefly/playerdata.yml`.
+3. Start the server. Firefly creates `plugins/Firefly/config.yml` (and `playerdata.yml` when using the
+   default YAML storage). It works out of the box — no configuration required.
 
 ## Commands
 
@@ -45,7 +46,7 @@ Base command: `/firefly` (alias `/ff`).
 | `/firefly color reset` | `firefly.use` | Reset your dot to the vanilla color. |
 | `/firefly bypass <on\|off\|toggle>` | `firefly.admin` | See-all: reveal players who have hidden their dot. |
 | `/firefly showhidden` | `firefly.admin` | List players who currently have their dot hidden. |
-| `/firefly reload` | `firefly.admin` | Reload `config.yml` and `playerdata.yml`. |
+| `/firefly reload` | `firefly.admin` | Reload `config.yml` and re-read player data from the active storage backend. |
 
 ### Colors
 
@@ -123,6 +124,30 @@ MySQL connects with TLS per `ssl`, `allowPublicKeyRetrieval=false`, and prepared
 keep the password in an environment variable via `${ENV_VAR}`; and grant the MySQL user only
 `SELECT/INSERT/UPDATE/DELETE` on `firefly_players` (plus `CREATE` once, or pre-create the table).
 
+#### Pre-creating the table (least-privilege)
+
+Firefly creates the table automatically (`CREATE TABLE IF NOT EXISTS`). If the database user isn't
+allowed to create tables, run [`schema.sql`](src/main/resources/schema.sql) yourself first — it's
+the exact DDL the plugin uses (portable across MySQL and H2):
+
+```sql
+CREATE TABLE IF NOT EXISTS firefly_players (
+    uuid   VARCHAR(36) PRIMARY KEY,
+    hidden BOOLEAN     NOT NULL DEFAULT FALSE,
+    color  INT         NULL,
+    bypass BOOLEAN     NULL
+);
+```
+
+Then grant only what's needed:
+
+```sql
+GRANT SELECT, INSERT, UPDATE, DELETE ON firefly.firefly_players TO 'firefly'@'%';
+```
+
+The only access patterns are primary-key lookups on `uuid` (upsert/delete) and a full read at
+startup, so the `uuid` primary key is the only index needed — no secondary indexes.
+
 ## How it works
 
 The locator bar is driven by one `WAYPOINT` packet per tracked player, with `TRACK` / `UPDATE` /
@@ -145,22 +170,30 @@ region-locked world or entity state), it runs safely on Folia.
 ## Building
 
 ```bash
-mvn clean package
+mvn clean verify
 ```
 
-Produces `target/Firefly-1.0.jar` and runs the test suite (JUnit 6 + Mockito + MockBukkit).
-packetevents and the Paper API are `provided` — they are not bundled into the jar.
+Compiles, runs the test suite (JUnit 6 + Mockito + MockBukkit), enforces the JaCoCo coverage gate,
+and produces `target/Firefly-1.0.jar`. packetevents and the Paper API are `provided` (not bundled);
+HikariCP, H2, and the MySQL driver are shaded in and relocated under `com.mdwgames.firefly.lib.*`.
 
 ## Project layout
 
 ```
 src/main/java/com/mdwgames/firefly/
-  Firefly.java                      plugin entry point / wiring
-  command/FireflyCommand.java       /firefly executor + tab completion
-  data/PlayerPreferences.java       immutable preference snapshot
-  data/PreferenceStore.java         in-memory state + playerdata.yml persistence
-  listener/PlayerSessionListener.java  seeds bypass on join, cleans up on quit
-  locator/WaypointManager.java      packetevents listener — the core
-  util/ColorNames.java              named-color / hex parsing
-src/test/java/com/mdwgames/firefly/  tests mirror the production packages
+  Firefly.java                         plugin entry point / wiring
+  command/FireflyCommand.java          /firefly executor + tab completion
+  data/PlayerPreferences.java          immutable snapshot (hidden, color, tri-state bypass)
+  data/PreferenceStore.java            in-memory state; delegates persistence to a Storage backend
+  data/storage/Storage.java            persistence interface
+  data/storage/YamlStorage.java        flat-file backend (default)
+  data/storage/SqlStorage.java         HikariCP + JDBC backend (H2 / MySQL)
+  data/storage/FallbackStorage.java    falls back to YAML if the database can't be reached
+  data/storage/StorageFactory.java     builds the configured backend from config.yml
+  listener/PlayerSessionListener.java  seeds bypass on join (+ login reminder), cleans up on quit
+  locator/WaypointManager.java         packetevents listener — the core
+  util/ColorNames.java                 named-color / hex parsing
+src/main/resources/
+  plugin.yml, config.yml, schema.sql   descriptor, default config, SQL table DDL
+src/test/java/com/mdwgames/firefly/    tests mirror the production packages
 ```

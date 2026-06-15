@@ -5,6 +5,9 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -22,12 +25,9 @@ import java.util.UUID;
  */
 public final class SqlStorage implements Storage {
 
-    private static final String CREATE_TABLE =
-            "CREATE TABLE IF NOT EXISTS firefly_players ("
-                    + "uuid VARCHAR(36) PRIMARY KEY, "
-                    + "hidden BOOLEAN NOT NULL DEFAULT FALSE, "
-                    + "color INT NULL, "
-                    + "bypass BOOLEAN NULL)";
+    /** The DDL lives in src/main/resources/schema.sql so it's a single source of truth and users
+     *  can run it to pre-create the table (least-privilege setups). */
+    private static final String SCHEMA_RESOURCE = "/schema.sql";
     private static final String SELECT_ALL = "SELECT uuid, hidden, color, bypass FROM firefly_players";
     private static final String UPSERT =
             "INSERT INTO firefly_players (uuid, hidden, color, bypass) VALUES (?, ?, ?, ?) "
@@ -43,11 +43,25 @@ public final class SqlStorage implements Storage {
     }
 
     @Override
-    public void init() throws SQLException {
+    public void init() throws SQLException, IOException {
         // Pool creation connects, so it runs here (on the storage worker), never at construction.
         this.dataSource = new HikariDataSource(config);
         try (Connection c = dataSource.getConnection(); Statement st = c.createStatement()) {
-            st.execute(CREATE_TABLE);
+            st.execute(loadSchema());
+        }
+    }
+
+    /** Reads the bundled schema.sql (single CREATE TABLE statement) from the classpath. */
+    private static String loadSchema() throws IOException {
+        try (InputStream in = SqlStorage.class.getResourceAsStream(SCHEMA_RESOURCE)) {
+            if (in == null) {
+                throw new IOException("Bundled " + SCHEMA_RESOURCE + " not found on the classpath");
+            }
+            String sql = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
+            if (sql.endsWith(";")) {
+                sql = sql.substring(0, sql.length() - 1); // single statement — drop the trailing ';'
+            }
+            return sql;
         }
     }
 
