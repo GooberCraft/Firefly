@@ -70,10 +70,24 @@ public final class Messages {
     public @NotNull String get(@NotNull final String key, @NotNull final String... placeholders) {
         String raw = overrides.getOrDefault(key, defaults.getOrDefault(key, "&cmissing message: " + key));
         raw = raw.replace("{prefix}", overrides.getOrDefault(PREFIX_KEY, defaults.getOrDefault(PREFIX_KEY, "")));
+        // Translate the operator-controlled template FIRST, then substitute caller-supplied values.
+        // Inserting values after translation means their '&'/'§' sequences are treated as literal
+        // data, so untrusted input (e.g. a player-typed color string echoed back) can't inject
+        // color/format codes into the rendered message.
+        String message = ChatColor.translateAlternateColorCodes('&', raw);
         for (int i = 0; i + 1 < placeholders.length; i += 2) {
-            raw = raw.replace("{" + placeholders[i] + "}", placeholders[i + 1]);
+            message = message.replace("{" + placeholders[i] + "}", sanitizeValue(placeholders[i + 1]));
         }
-        return ChatColor.translateAlternateColorCodes('&', raw);
+        return message;
+    }
+
+    /**
+     * Neutralizes formatting in a caller-supplied placeholder value. Because the value is substituted
+     * after {@code &}-translation its {@code &} codes already stay literal; this additionally strips
+     * raw section signs ({@code §}) so an already-active code injected through the value can't render.
+     */
+    private static @NotNull String sanitizeValue(final String value) {
+        return value == null ? "" : value.replace(String.valueOf(ChatColor.COLOR_CHAR), "");
     }
 
     private static void copyStrings(final YamlConfiguration yaml, final Map<String, String> into) {

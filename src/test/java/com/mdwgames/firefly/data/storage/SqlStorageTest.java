@@ -2,6 +2,7 @@ package com.mdwgames.firefly.data.storage;
 
 import com.mdwgames.firefly.data.PlayerPreferences;
 import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -73,6 +75,25 @@ class SqlStorageTest {
         assertFalse(loaded.hidden());
         assertEquals(0x222222, loaded.colorRgb());
         assertEquals(Boolean.TRUE, loaded.bypass());
+    }
+
+    @Test
+    @DisplayName("re-init (e.g. /firefly reload) closes the previous pool instead of leaking it")
+    void reinitClosesOldPool() throws Exception {
+        final HikariDataSource first = storage.dataSource(); // opened by setUp's init()
+        assertFalse(first.isClosed());
+
+        storage.init(); // simulate load() running again on reload
+        final HikariDataSource second = storage.dataSource();
+
+        assertNotSame(first, second, "re-init should create a new pool");
+        assertTrue(first.isClosed(), "the previous pool must be closed, not leaked");
+        assertFalse(second.isClosed());
+
+        // the re-initialized backend is still fully functional
+        final UUID id = UUID.randomUUID();
+        storage.save(Map.of(id, new PlayerPreferences(true, null, null)));
+        assertTrue(storage.loadAll().containsKey(id));
     }
 
     @Test

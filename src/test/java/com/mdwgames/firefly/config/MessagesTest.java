@@ -44,6 +44,18 @@ class MessagesTest {
     }
 
     @Test
+    @DisplayName("color/format codes in a caller-supplied value are neutralized, not interpreted")
+    void placeholderValueCannotInjectColors(@TempDir final Path dir) {
+        final Messages m = load(dir);
+        // A player types a 'color' carrying legacy & codes and a raw section-sign code; it is echoed
+        // back via {input} in color-unknown. None of it may become active formatting.
+        final String evil = "&c&lHACK" + SECTION + "kX";
+        final String msg = m.get("color-unknown", "input", evil);
+        assertTrue(msg.contains("&c&lHACK"), "value '&' codes must stay literal: " + msg);
+        assertFalse(msg.contains(SECTION + "k"), "section-sign code from the value must be stripped: " + msg);
+    }
+
+    @Test
     @DisplayName("a missing key falls back to a visible placeholder, not an exception")
     void missingKey(@TempDir final Path dir) {
         assertTrue(load(dir).get("no-such-key").contains("missing message: no-such-key"));

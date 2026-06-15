@@ -45,6 +45,11 @@ public final class SqlStorage implements Storage {
     @Override
     public void init() throws SQLException, IOException {
         // Pool creation connects, so it runs here (on the storage worker), never at construction.
+        // init() can run again on the same instance (e.g. /firefly reload re-runs load()); close the
+        // previous pool first so a re-init replaces it instead of leaking its connections + threads.
+        if (dataSource != null) {
+            dataSource.close();
+        }
         this.dataSource = new HikariDataSource(config);
         try (Connection c = dataSource.getConnection(); Statement st = c.createStatement()) {
             st.execute(loadSchema());
@@ -127,6 +132,11 @@ public final class SqlStorage implements Storage {
         if (dataSource != null) {
             dataSource.close();
         }
+    }
+
+    /** Visible for tests: the live pool, to assert a re-init closes the previous one rather than leaking it. */
+    HikariDataSource dataSource() {
+        return dataSource;
     }
 
     private static UUID parseUuid(final String raw) {

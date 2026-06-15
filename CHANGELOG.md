@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Player-supplied text echoed in messages (e.g. an unknown color in `/firefly color`) can no longer
+  inject color or formatting codes into the rendered message.
+
+### Fixed
+- The H2/MySQL connection pool is no longer leaked when `/firefly reload` re-initializes storage; the
+  previous pool is now closed first.
+
 ## [1.1.0] - 2026-06-15
 
 ### Added
