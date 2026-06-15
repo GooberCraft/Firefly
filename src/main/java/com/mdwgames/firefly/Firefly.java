@@ -1,6 +1,7 @@
 package com.mdwgames.firefly;
 
 import com.mdwgames.firefly.command.FireflyCommand;
+import com.mdwgames.firefly.config.Messages;
 import com.mdwgames.firefly.data.PreferenceStore;
 import com.mdwgames.firefly.data.storage.Storage;
 import com.mdwgames.firefly.data.storage.StorageFactory;
@@ -10,6 +11,7 @@ import org.bstats.bukkit.Metrics;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,6 +36,9 @@ public final class Firefly extends JavaPlugin {
         }
 
         saveDefaultConfig();
+        saveResource("messages.yml", false); // write the default messages file if absent
+        final Messages messages = new Messages(new File(getDataFolder(), "messages.yml"), getLogger());
+        messages.load();
 
         // Single dedicated thread for all storage I/O — keeps JDBC/file work off the main thread.
         storageWorker = Executors.newSingleThreadExecutor(r -> {
@@ -49,11 +54,11 @@ public final class Firefly extends JavaPlugin {
 
         final boolean bypassDefault = getConfig().getBoolean("admin-bypass.default", false);
         getServer().getPluginManager().registerEvents(
-                new PlayerSessionListener(store, waypointManager, bypassDefault), this);
+                new PlayerSessionListener(store, waypointManager, messages, bypassDefault), this);
 
         final PluginCommand command = getCommand("firefly");
         if (command != null) {
-            final FireflyCommand executor = new FireflyCommand(this, store, waypointManager);
+            final FireflyCommand executor = new FireflyCommand(this, store, waypointManager, messages);
             command.setExecutor(executor);
             command.setTabCompleter(executor);
         } else {

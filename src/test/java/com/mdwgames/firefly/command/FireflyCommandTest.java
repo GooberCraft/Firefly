@@ -1,5 +1,6 @@
 package com.mdwgames.firefly.command;
 
+import com.mdwgames.firefly.config.Messages;
 import com.mdwgames.firefly.data.PreferenceStore;
 import com.mdwgames.firefly.data.storage.Storage;
 import com.mdwgames.firefly.data.storage.YamlStorage;
@@ -49,7 +50,10 @@ class FireflyCommandTest {
         final Storage storage = new YamlStorage(new File(dir.toFile(), "playerdata.yml"), Logger.getLogger("test"));
         store = new PreferenceStore(storage, worker, Logger.getLogger("test"));
         final WaypointManager manager = new WaypointManager(plugin, store);
-        cmd = new FireflyCommand(plugin, store, manager);
+        // No messages.yml on disk -> Messages falls back to the bundled defaults (on the test classpath).
+        final Messages messages = new Messages(new File(dir.toFile(), "messages.yml"), Logger.getLogger("test"));
+        messages.load();
+        cmd = new FireflyCommand(plugin, store, manager, messages);
         bukkitCmd = mock(Command.class);
     }
 

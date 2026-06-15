@@ -30,8 +30,8 @@ locator control, so packetevents is a hard dependency.
 
 1. Install the **packetevents** plugin in your server's `plugins/` folder.
 2. Drop `Firefly-1.0.jar` (from `target/` after building) into `plugins/`.
-3. Start the server. Firefly creates `plugins/Firefly/config.yml` (and `playerdata.yml` when using the
-   default YAML storage). It works out of the box — no configuration required.
+3. Start the server. Firefly creates `plugins/Firefly/config.yml`, `messages.yml` (and `playerdata.yml`
+   when using the default YAML storage). It works out of the box — no configuration required.
 
 ## Commands
 
@@ -147,6 +147,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON firefly.firefly_players TO 'firefly'@'%'
 
 The only access patterns are primary-key lookups on `uuid` (upsert/delete) and a full read at
 startup, so the `uuid` primary key is the only index needed — no secondary indexes.
+
+### Messages / localization
+
+Every message the plugin sends is customizable and translatable in `plugins/Firefly/messages.yml`.
+Edit the text, color with legacy `&` codes (`&a`, `&l`, `&r`, …), and reload with `/firefly reload`.
+Keys you don't change fall back to the built-in English defaults, so the file never breaks across
+updates. Placeholders like `{prefix}`, `{color}`, `{player}`, and `{count}` are filled in by the
+plugin (documented inline in the file).
 
 ## How it works
 

@@ -1,0 +1,52 @@
+# ============================================================================
+#  Firefly messages — customize / translate every message the plugin sends.
+#
+#  - Color/format with legacy '&' codes (e.g. &a green, &c red, &l bold, &r reset).
+#  - {prefix} is replaced with the 'prefix' value below.
+#  - Other {tokens} are filled in by the plugin (documented per line).
+#  - Missing or deleted keys fall back to the built-in English default, so this
+#    file never breaks across updates — you only need to keep the lines you change.
+#  - Reload after editing with /firefly reload.
+# ============================================================================
+
+prefix: "&6[Firefly] &r"
+
+# --- Player: hide / show ---
+dot-hidden: "{prefix}&aYour locator-bar dot is now hidden from other players."
+dot-shown: "{prefix}&aYour locator-bar dot is now visible to other players."
+
+# --- Player: color ---  ({color} = chosen color, {input} = what they typed)
+color-usage: "{prefix}&cUsage: /firefly color <name|#RRGGBB|reset>"
+color-set: "{prefix}&aYour locator-bar dot color is now {color}."
+color-reset: "{prefix}&aYour locator-bar dot color was reset to the default."
+color-unknown: "{prefix}&cUnknown color '{input}'. Use a named color or #RRGGBB hex."
+
+# --- Admin: bypass ---
+bypass-usage: "{prefix}&cUsage: /firefly bypass <on|off|toggle>"
+bypass-enabled: "{prefix}&aSee-all bypass is now ON. You now see players who hid their dot."
+bypass-disabled: "{prefix}&aSee-all bypass is now OFF. You no longer see players who hid their dot."
+# Sent on login when an admin's bypass is active.
+bypass-login-reminder: "{prefix}&eSee-all bypass is active — you can see players who hid their dot. &7Use /firefly bypass off to disable."
+
+# --- Admin: showhidden ---  ({count} = number hidden, {player} = player name)
+showhidden-none: "{prefix}&eNo players currently have their dot hidden."
+showhidden-header: "{prefix}&ePlayers hiding their locator-bar dot ({count}):"
+showhidden-entry: "  &a{player}"
+showhidden-entry-offline: "  &7{player} (offline)"
+
+# --- Admin: reload ---
+reload-success: "{prefix}&aFirefly configuration, messages, and player data reloaded."
+
+# --- Errors ---  ({label} = the command alias used, e.g. firefly or ff)
+unknown-subcommand: "{prefix}&cUnknown subcommand. Try /{label} help"
+no-permission: "{prefix}&cYou don't have permission to do that."
+players-only: "{prefix}&cOnly players can use this command."
+bypass-players-only: "{prefix}&cOnly players can toggle their own bypass."
+
+# --- Help ---
+help-header: "{prefix}&eLocator-bar controls:"
+help-hide: "&6  /firefly hide|show|toggle&7 - hide or show your dot"
+help-color: "&6  /firefly color <name|#RRGGBB|reset>&7 - set your dot color"
+help-bypass: "&6  /firefly bypass <on|off|toggle>&7 - see hidden players"
+help-showhidden: "&6  /firefly showhidden&7 - list hidden players"
+help-reload: "&6  /firefly reload&7 - reload config & player data"

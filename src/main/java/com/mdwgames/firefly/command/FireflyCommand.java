@@ -1,10 +1,10 @@
 package com.mdwgames.firefly.command;
 
+import com.mdwgames.firefly.config.Messages;
 import com.mdwgames.firefly.data.PreferenceStore;
 import com.mdwgames.firefly.locator.WaypointManager;
 import com.mdwgames.firefly.util.ColorNames;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -25,17 +25,12 @@ import java.util.UUID;
  * Handles {@code /firefly} (alias {@code /ff}). Self-service subcommands (hide/show/toggle/color)
  * are gated by {@code firefly.use}; admin subcommands (bypass/showhidden/reload) by
  * {@code firefly.admin}. Each preference change calls {@link WaypointManager#scheduleRefresh()} so it
- * applies to the locator bar.
+ * applies to the locator bar. All player-facing text comes from {@link Messages} (messages.yml).
  */
-// ChatColor is deprecated on Paper (which prefers Adventure), but Adventure is Paper-only; we use
-// ChatColor deliberately so messages also work on Spigot. Suppress the resulting deprecation noise.
-@SuppressWarnings("deprecation")
 public final class FireflyCommand implements CommandExecutor, TabCompleter {
 
     public static final String PERM_USE = "firefly.use";
     public static final String PERM_ADMIN = "firefly.admin";
-
-    private static final String PREFIX = ChatColor.GOLD + "[Firefly] " + ChatColor.RESET;
 
     private static final List<String> USER_SUBS = List.of("hide", "show", "toggle", "color");
     private static final List<String> ADMIN_SUBS = List.of("bypass", "showhidden", "reload");
@@ -43,12 +38,14 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
     private final Plugin plugin;
     private final PreferenceStore store;
     private final WaypointManager manager;
+    private final Messages messages;
 
     public FireflyCommand(@NotNull final Plugin plugin, @NotNull final PreferenceStore store,
-                          @NotNull final WaypointManager manager) {
+                          @NotNull final WaypointManager manager, @NotNull final Messages messages) {
         this.plugin = plugin;
         this.store = store;
         this.manager = manager;
+        this.messages = messages;
     }
 
     @Override
@@ -67,9 +64,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             case "showhidden" -> handleShowHidden(sender);
             case "reload" -> handleReload(sender);
             case "help" -> sendHelp(sender);
-            default -> {
-                sender.sendMessage(PREFIX + ChatColor.RED + "Unknown subcommand. Try /" + label + " help");
-            }
+            default -> sender.sendMessage(messages.get("unknown-subcommand", "label", label));
         }
         return true;
     }
@@ -83,11 +78,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
         }
         store.setHidden(player.getUniqueId(), hide);
         manager.scheduleRefresh();
-        if (hide) {
-            sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot is now hidden from other players.");
-        } else {
-            sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot is now visible to other players.");
-        }
+        sender.sendMessage(messages.get(hide ? "dot-hidden" : "dot-shown"));
     }
 
     private void handleToggle(final CommandSender sender) {
@@ -98,8 +89,7 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
         final boolean nowHidden = !store.isHidden(player.getUniqueId());
         store.setHidden(player.getUniqueId(), nowHidden);
         manager.scheduleRefresh();
-        sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot is now "
-                + (nowHidden ? "hidden." : "visible."));
+        sender.sendMessage(messages.get(nowHidden ? "dot-hidden" : "dot-shown"));
     }
 
     private void handleColor(final CommandSender sender, final String[] args) {
@@ -108,25 +98,23 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            sender.sendMessage(PREFIX + ChatColor.RED + "Usage: /firefly color <name|#RRGGBB|reset>");
+            sender.sendMessage(messages.get("color-usage"));
             return;
         }
         if (args[1].equalsIgnoreCase("reset") || args[1].equalsIgnoreCase("clear")) {
             store.clearColor(player.getUniqueId());
             manager.scheduleRefresh();
-            sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot color was reset to default.");
+            sender.sendMessage(messages.get("color-reset"));
             return;
         }
         final OptionalInt parsed = ColorNames.parse(args[1]);
         if (parsed.isEmpty()) {
-            sender.sendMessage(PREFIX + ChatColor.RED + "Unknown color '" + args[1]
-                    + "'. Use a named color or #RRGGBB hex.");
+            sender.sendMessage(messages.get("color-unknown", "input", args[1]));
             return;
         }
         store.setColor(player.getUniqueId(), parsed.getAsInt());
         manager.scheduleRefresh();
-        sender.sendMessage(PREFIX + ChatColor.GREEN + "Your locator-bar dot color is now "
-                + ColorNames.format(parsed.getAsInt()) + ".");
+        sender.sendMessage(messages.get("color-set", "color", ColorNames.format(parsed.getAsInt())));
     }
 
     // ========== Admin (firefly.admin) ==========
@@ -145,14 +133,12 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
         } else if (args[1].equalsIgnoreCase("off")) {
             target = false;
         } else {
-            sender.sendMessage(PREFIX + ChatColor.RED + "Usage: /firefly bypass <on|off|toggle>");
+            sender.sendMessage(messages.get("bypass-usage"));
             return;
         }
         store.setBypass(player.getUniqueId(), target);
         manager.scheduleRefresh();
-        sender.sendMessage(PREFIX + ChatColor.GREEN + "See-all bypass is now " + (target ? "ON" : "OFF")
-                + ChatColor.GREEN + ". You " + (target ? "now see" : "no longer see")
-                + " players who hid their dot.");
+        sender.sendMessage(messages.get(target ? "bypass-enabled" : "bypass-disabled"));
     }
 
     private void handleShowHidden(final CommandSender sender) {
@@ -162,17 +148,15 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
         }
         final Set<UUID> hidden = store.hiddenPlayers();
         if (hidden.isEmpty()) {
-            sender.sendMessage(PREFIX + ChatColor.YELLOW + "No players currently have their dot hidden.");
+            sender.sendMessage(messages.get("showhidden-none"));
             return;
         }
-        sender.sendMessage(PREFIX + ChatColor.YELLOW + "Players hiding their locator-bar dot ("
-                + hidden.size() + "):");
+        sender.sendMessage(messages.get("showhidden-header", "count", String.valueOf(hidden.size())));
         for (final UUID uuid : hidden) {
             final OfflinePlayer off = Bukkit.getOfflinePlayer(uuid);
             final String name = off.getName() != null ? off.getName() : uuid.toString();
-            final boolean online = off.isOnline();
-            sender.sendMessage("  " + (online ? ChatColor.GREEN : ChatColor.GRAY) + name
-                    + (online ? "" : " (offline)"));
+            sender.sendMessage(messages.get(off.isOnline() ? "showhidden-entry" : "showhidden-entry-offline",
+                    "player", name));
         }
     }
 
@@ -182,17 +166,18 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             return;
         }
         plugin.reloadConfig();
+        messages.load();
         // Re-read player data from the current backend, then reconcile once it lands. (Switching
         // storage.type itself requires a restart.)
         store.load(manager::scheduleRefresh);
-        sender.sendMessage(PREFIX + ChatColor.GREEN + "Firefly configuration and player data reloaded.");
+        sender.sendMessage(messages.get("reload-success"));
     }
 
     // ========== Helpers ==========
 
     private @Nullable Player requireUser(final CommandSender sender) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(PREFIX + ChatColor.RED + "Only players can use this command.");
+            sender.sendMessage(messages.get("players-only"));
             return null;
         }
         if (!sender.hasPermission(PERM_USE)) {
@@ -208,26 +193,26 @@ public final class FireflyCommand implements CommandExecutor, TabCompleter {
             return null;
         }
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(PREFIX + ChatColor.RED + "Only players can toggle their own bypass.");
+            sender.sendMessage(messages.get("bypass-players-only"));
             return null;
         }
         return player;
     }
 
     private void denied(final CommandSender sender) {
-        sender.sendMessage(PREFIX + ChatColor.RED + "You don't have permission to do that.");
+        sender.sendMessage(messages.get("no-permission"));
     }
 
     private void sendHelp(final CommandSender sender) {
-        sender.sendMessage(PREFIX + ChatColor.YELLOW + "Locator-bar controls:");
+        sender.sendMessage(messages.get("help-header"));
         if (sender.hasPermission(PERM_USE)) {
-            sender.sendMessage(ChatColor.GOLD + "  /firefly hide|show|toggle" + ChatColor.GRAY + " - hide or show your dot");
-            sender.sendMessage(ChatColor.GOLD + "  /firefly color <name|#RRGGBB|reset>" + ChatColor.GRAY + " - set your dot color");
+            sender.sendMessage(messages.get("help-hide"));
+            sender.sendMessage(messages.get("help-color"));
         }
         if (sender.hasPermission(PERM_ADMIN)) {
-            sender.sendMessage(ChatColor.GOLD + "  /firefly bypass <on|off|toggle>" + ChatColor.GRAY + " - see hidden players");
-            sender.sendMessage(ChatColor.GOLD + "  /firefly showhidden" + ChatColor.GRAY + " - list hidden players");
-            sender.sendMessage(ChatColor.GOLD + "  /firefly reload" + ChatColor.GRAY + " - reload config & player data");
+            sender.sendMessage(messages.get("help-bypass"));
+            sender.sendMessage(messages.get("help-showhidden"));
+            sender.sendMessage(messages.get("help-reload"));
         }
     }
 

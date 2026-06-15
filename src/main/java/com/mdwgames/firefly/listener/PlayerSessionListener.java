@@ -1,9 +1,9 @@
 package com.mdwgames.firefly.listener;
 
 import com.mdwgames.firefly.command.FireflyCommand;
+import com.mdwgames.firefly.config.Messages;
 import com.mdwgames.firefly.data.PreferenceStore;
 import com.mdwgames.firefly.locator.WaypointManager;
-import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -16,19 +16,18 @@ import org.jetbrains.annotations.NotNull;
  * default) and reminds them if it's active; drops a player's cached locator-bar state on quit so
  * the maps don't leak.
  */
-// ChatColor is deprecated on Paper but used deliberately for cross-platform (Spigot) message
-// coloring — see FireflyCommand. Suppress the deprecation noise.
-@SuppressWarnings("deprecation")
 public final class PlayerSessionListener implements Listener {
 
     private final PreferenceStore store;
     private final WaypointManager manager;
+    private final Messages messages;
     private final boolean bypassDefault;
 
     public PlayerSessionListener(@NotNull final PreferenceStore store, @NotNull final WaypointManager manager,
-                                 final boolean bypassDefault) {
+                                 @NotNull final Messages messages, final boolean bypassDefault) {
         this.store = store;
         this.manager = manager;
+        this.messages = messages;
         this.bypassDefault = bypassDefault;
     }
 
@@ -40,9 +39,7 @@ public final class PlayerSessionListener implements Listener {
         }
         final boolean active = store.seedBypass(player.getUniqueId(), bypassDefault);
         if (active) {
-            player.sendMessage(ChatColor.GOLD + "[Firefly] " + ChatColor.YELLOW
-                    + "See-all bypass is active — you can see players who hid their dot. "
-                    + ChatColor.GRAY + "Use /firefly bypass off to disable.");
+            player.sendMessage(messages.get("bypass-login-reminder"));
         }
     }
 

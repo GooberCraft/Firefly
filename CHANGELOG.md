@@ -7,4 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Customizable, translatable messages via `messages.yml` — every player-facing string can be edited,
+  colored with legacy `&` codes, and reloaded with `/firefly reload`; missing keys fall back to the
+  built-in defaults.
+
 [Unreleased]: https://github.com/GooberCraft/Firefly/commits/master
