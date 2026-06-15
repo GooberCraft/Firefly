@@ -9,15 +9,19 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
-      id-token: write  # Required for attestation signing
-      attestations: write  # Required for publishing attestations
+      contents: write       # upload assets to the release
+      id-token: write       # required for build-provenance attestation
+      attestations: write   # required to publish the attestation
 
-    # Third-party / external actions are pinned to a commit SHA (not a mutable
-    # major tag) because this job holds id-token + attestations write scope.
-    # Dependabot's github-actions ecosystem reads the `# vX.Y.Z` trailer and
-    # bumps both the SHA and the comment via a reviewed PR.
+    # Third-party / external actions are pinned to a commit SHA (not a mutable major tag) because
+    # this job holds id-token + attestations write scope. Dependabot's github-actions ecosystem
+    # reads the `# vX.Y.Z` trailer and bumps both the SHA and the comment via a reviewed PR.
     steps:
+    - name: Harden runner
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      with:
+        egress-policy: audit
+
     - name: Checkout code
       uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
@@ -28,30 +32,39 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    # Build, test, and enforce Jacoco coverage gate. `verify` is required (not `package`)
-    # because jacoco:check is bound to the verify phase.
-    - name: Build with Maven
-      run: mvn clean verify
-
-    # Extract version from git tag instead of running Maven
+    # Tag convention is vX.Y.Z; strip the leading 'v' so the Maven version + artifact stay clean.
     - name: Get version from tag
-      id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
-    # Generate build provenance attestation
+    # Pin the build to the tag so the released jar always matches it, even if pom.xml wasn't bumped.
+    - name: Set project version from tag
+      run: mvn -B -ntp versions:set -DnewVersion=${{ steps.version.outputs.VERSION }} -DgenerateBackupPoms=false
+
+    # `verify` (not `package`) enforces the JaCoCo coverage gate before anything ships.
+    - name: Build and verify
+      run: mvn -B -ntp clean verify
+
+    - name: Generate checksum
+      run: |
+        cd target
+        sha256sum "Firefly-${{ steps.version.outputs.VERSION }}.jar" \
+          > "Firefly-${{ steps.version.outputs.VERSION }}.jar.sha256"
+
+    # Build-provenance attestation — lets consumers verify a downloaded jar came from this repo's
+    # release workflow via `gh attestation verify <jar> --repo GooberCraft/Firefly`.
     - name: Attest build provenance
       uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
       with:
         subject-path: 'target/Firefly-*.jar'
 
-    # Upload JAR and CycloneDX SBOMs (XML + JSON) to GitHub Releases.
-    # The SBOMs document the dependency tree so consumers can audit transitive
-    # deps without unpacking the jar.
+    # Attach the jar, its SHA-256 checksum, and both CycloneDX SBOMs to the GitHub Release.
     - name: Upload release assets
       uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
       with:
         files: |
           target/Firefly-*.jar
+          target/Firefly-*.jar.sha256
           target/bom.xml
           target/bom.json
         fail_on_unmatched_files: true
