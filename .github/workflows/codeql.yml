@@ -1,12 +1,10 @@
 name: CodeQL
 
 on:
-  push:
-    branches: [ master, develop ]
   pull_request:
     branches: [ master, develop ]
   schedule:
-    # Run at 6:00 AM UTC every Monday
+    # Run at 6:00 AM UTC every Monday (covers the default branch between PRs)
     - cron: '0 6 * * 1'
 
 # Cancel in-progress runs when a new run is triggered
@@ -51,9 +49,9 @@ jobs:
         # Prefix the list here with "+" to use these queries and those in the config file.
         queries: security-extended
 
-    # Build the project (CodeQL needs to analyze the build)
+    # CodeQL only needs the compiled classes — compile (not package) skips shade + SBOM.
     - name: Build with Maven
-      run: mvn clean package -DskipTests
+      run: mvn -B -ntp -nsu clean compile -DskipTests
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4

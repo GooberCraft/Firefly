@@ -39,19 +39,11 @@ jobs:
         distribution: 'temurin'
         cache: maven
 
-    # Optional: Cache compiled classes for faster rebuilds
-    - name: Cache build output
-      uses: actions/cache@v5
-      with:
-        path: target
-        key: ${{ runner.os }}-maven-build-${{ matrix.java-version }}-${{ hashFiles('**/pom.xml', 'src/**') }}
-        restore-keys: |
-          ${{ runner.os }}-maven-build-${{ matrix.java-version }}-
-
     # Combined: Build, test, and enforce Jacoco coverage gate in one command.
     # `verify` is required (not `package`) because jacoco:check is bound to the verify phase.
+    # -nsu skips per-build SNAPSHOT re-checks; the SBOM is skipped here (only release.yml needs it).
     - name: Build, test, and verify coverage
-      run: mvn clean verify
+      run: mvn -B -ntp -nsu clean verify -Dcyclonedx.skip=true
 
     # Only publish test results from the Java 21 build (reduces noise)
     - name: Publish test results
