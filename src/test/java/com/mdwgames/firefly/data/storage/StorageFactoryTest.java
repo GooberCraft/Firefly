@@ -1,18 +1,63 @@
 package com.mdwgames.firefly.data.storage;
 
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.file.Path;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 
 @DisplayName("StorageFactory (pure helpers)")
 class StorageFactoryTest {
+
+    /** A plugin whose data folder is a temp dir — enough for create() (no Bukkit server needed). */
+    private static Plugin plugin(final Path dir) {
+        final Plugin p = mock(Plugin.class);
+        lenient().when(p.getDataFolder()).thenReturn(dir.toFile());
+        lenient().when(p.getLogger()).thenReturn(Logger.getLogger("StorageFactoryTest"));
+        return p;
+    }
+
+    private static YamlConfiguration config(final String... pairs) {
+        final YamlConfiguration c = new YamlConfiguration();
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            c.set(pairs[i], pairs[i + 1]);
+        }
+        return c;
+    }
+
+    @Test
+    @DisplayName("create() selects the backend by storage.type (and defaults to YAML)")
+    void createSelectsBackend(@TempDir final Path dir) {
+        final Plugin p = plugin(dir);
+        assertInstanceOf(YamlStorage.class, StorageFactory.create(p, new YamlConfiguration())); // default
+        assertInstanceOf(YamlStorage.class, StorageFactory.create(p, config("storage.type", "yaml")));
+        // SQL backends are wrapped for YAML fallback; create() does not connect.
+        assertInstanceOf(FallbackStorage.class, StorageFactory.create(p, config("storage.type", "h2")));
+        assertInstanceOf(FallbackStorage.class, StorageFactory.create(p, config("storage.type", "mysql")));
+    }
+
+    @Test
+    @DisplayName("create() falls back to YAML on an unknown type or an invalid H2 file name")
+    void createFallsBackToYaml(@TempDir final Path dir) {
+        final Plugin p = plugin(dir);
+        assertInstanceOf(YamlStorage.class, StorageFactory.create(p, config("storage.type", "nonsense")));
+        // a hostile h2.file is rejected during config build -> YAML
+        assertInstanceOf(YamlStorage.class,
+                StorageFactory.create(p, config("storage.type", "h2", "storage.h2.file", "a;INIT=x")));
+    }
 
     @Test
     @DisplayName("H2 file name is sanitized to a safe token")

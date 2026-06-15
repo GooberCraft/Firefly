@@ -12,6 +12,8 @@ final class FakeStorage implements Storage {
 
     final Map<UUID, PlayerPreferences> data = new HashMap<>();
     boolean failInit = false;
+    boolean failLoad = false;
+    boolean closed = false;
 
     @Override
     public void init() {
@@ -22,6 +24,9 @@ final class FakeStorage implements Storage {
 
     @Override
     public @NotNull Map<UUID, PlayerPreferences> loadAll() {
+        if (failLoad) {
+            throw new IllegalStateException("simulated load failure");
+        }
         return new HashMap<>(data);
     }
 
@@ -38,6 +43,6 @@ final class FakeStorage implements Storage {
 
     @Override
     public void close() {
-        // no-op
+        closed = true;
     }
 }

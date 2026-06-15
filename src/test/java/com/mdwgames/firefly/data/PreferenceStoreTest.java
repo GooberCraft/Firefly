@@ -144,4 +144,24 @@ class PreferenceStoreTest {
         store.setHidden(id, true);
         assertTrue(store.hasPreferences());
     }
+
+    @Test
+    @DisplayName("close flushes pending changes and closes the storage")
+    void closeFlushesAndCloses() {
+        final UUID id = UUID.randomUUID();
+        store.setHidden(id, true); // queues a flush
+        store.close();             // final flush + storage.close + worker shutdown/await
+        assertTrue(storage.data.get(id).hidden(), "pending change should be flushed on close");
+        assertTrue(storage.closed, "storage should be closed");
+    }
+
+    @Test
+    @DisplayName("a load failure is handled and still signals ready")
+    void loadFailureIsHandled() throws Exception {
+        storage.failLoad = true;
+        final boolean[] ready = {false};
+        store.load(() -> ready[0] = true);
+        sync();
+        assertTrue(ready[0], "onReady should run even when loadAll fails");
+    }
 }
