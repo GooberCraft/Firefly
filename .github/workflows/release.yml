@@ -19,14 +19,16 @@ jobs:
     steps:
     # Block mode: fail the build on any egress outside this allowlist. The list is exactly the
     # workflow-specific hosts (Sigstore for the attestation + the three Maven repos + GitHub
-    # API/git/upload); GitHub Actions runtime endpoints (*.actions.githubusercontent.com,
-    # *.blob.core.windows.net, the OIDC token host) are allowed by harden-runner's baseline.
+    # API/git/upload + the Modrinth API for publishing); GitHub Actions runtime endpoints
+    # (*.actions.githubusercontent.com, *.blob.core.windows.net, the OIDC token host) are allowed
+    # by harden-runner's baseline.
     - name: Harden runner
       uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
       with:
         egress-policy: block
         allowed-endpoints: >
           api.github.com:443
+          api.modrinth.com:443
           fulcio.sigstore.dev:443
           github.com:443
           rekor.sigstore.dev:443
@@ -83,3 +85,35 @@ jobs:
         fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Publish the shaded jar to Modrinth. Only `modrinth-token` is provided, so mc-publish targets
+    # Modrinth alone (the GitHub Release is already populated by the step above). Pinned to a commit
+    # SHA — Dependabot's github-actions ecosystem reads the `# vX.Y.Z` trailer and bumps both.
+    # NOTE: `modrinth-id` is the project slug created on Modrinth — confirm it matches before relying
+    # on this. The upload only matches the shaded `Firefly-<ver>.jar` (not `original-Firefly-*.jar`).
+    - name: Publish to Modrinth
+      uses: Kir-Antipov/mc-publish@995edadc13559a8b28d0b7e6571229f067ec7659 # v3.3.0
+      with:
+        modrinth-id: firefly-plugin
+        modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+        files: target/Firefly-${{ steps.version.outputs.VERSION }}.jar
+        name: Firefly ${{ steps.version.outputs.VERSION }}
+        version: ${{ steps.version.outputs.VERSION }}
+        version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+        changelog: ${{ github.event.release.body }}
+        loaders: |
+          paper
+          spigot
+          folia
+        game-versions: |
+          1.21.6
+          1.21.7
+          1.21.8
+          1.21.9
+          1.21.10
+          1.21.11
+          26.1
+          26.1.1
+          26.1.2
+        dependencies: |
+          packetevents(required)

@@ -11,9 +11,28 @@
 
     <name>Firefly</name>
 
+    <licenses>
+        <license>
+            <name>GNU General Public License v3.0 only</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- paper-api the default build compiles + tests against: the floor, 1.21.6 (the minimum
+             Minecraft version Firefly supports), so the build fails if we use any API newer than
+             1.21.6. The ceiling workflow overrides this (and java.version) to verify the newest
+             supported build. The MockBukkit coordinate below is matched to this floor. -->
+        <paper.api.version>1.21.6-R0.1-SNAPSHOT</paper.api.version>
+        <!-- MockBukkit test harness, matched to paper.api.version. mockbukkit-v1.21:4.59.0 is the
+             newest MockBukkit built against Paper 1.21.6 (4.60.0+ require 1.21.7+ and refuse to run
+             on it). The ceiling workflow overrides both coordinates (to mockbukkit-v26.1.2) so the
+             full test suite runs against the 26.x ceiling too. -->
+        <mockbukkit.artifact>mockbukkit-v1.21</mockbukkit.artifact>
+        <mockbukkit.version>4.59.0</mockbukkit.version>
     </properties>
 
     <build>
@@ -208,7 +227,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.11-R0.1-SNAPSHOT</version>
+            <version>${paper.api.version}</version>
             <scope>provided</scope>
         </dependency>
 
@@ -287,8 +306,8 @@
         </dependency>
         <dependency>
             <groupId>org.mockbukkit.mockbukkit</groupId>
-            <artifactId>mockbukkit-v1.21</artifactId>
-            <version>4.110.0</version>
+            <artifactId>${mockbukkit.artifact}</artifactId>
+            <version>${mockbukkit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
