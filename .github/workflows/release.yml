@@ -19,8 +19,7 @@ jobs:
     steps:
     # Block mode: fail the build on any egress outside this allowlist. The list is exactly the
     # workflow-specific hosts (Sigstore for the attestation + the three Maven repos + GitHub
-    # API/git/upload + the Modrinth API and Mojang's piston-meta version manifest for publishing);
-    # GitHub Actions runtime endpoints
+    # API/git/upload + the Modrinth API for publishing); GitHub Actions runtime endpoints
     # (*.actions.githubusercontent.com, *.blob.core.windows.net, the OIDC token host) are allowed
     # by harden-runner's baseline.
     - name: Harden runner
@@ -32,7 +31,6 @@ jobs:
           api.modrinth.com:443
           fulcio.sigstore.dev:443
           github.com:443
-          piston-meta.mojang.com:443
           rekor.sigstore.dev:443
           repo.codemc.io:443
           repo.maven.apache.org:443
@@ -88,26 +86,26 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # Publish the shaded jar to Modrinth. Only `modrinth-token` is provided, so mc-publish targets
-    # Modrinth alone (the GitHub Release is already populated by the step above). Pinned to a commit
-    # SHA — Dependabot's github-actions ecosystem reads the `# vX.Y.Z` trailer and bumps both.
-    # NOTE: `modrinth-id` is the project slug created on Modrinth — confirm it matches before relying
-    # on this. The upload only matches the shaded `Firefly-<ver>.jar` (not `original-Firefly-*.jar`).
+    # Publish the shaded jar to Modrinth (best-effort: continue-on-error keeps a Modrinth hiccup from
+    # failing the GitHub release, which is the source of truth). Same actively-maintained action used
+    # by the StormtrooperX release. Pinned to a commit SHA — Dependabot reads the `# vX.Y.Z` trailer.
+    # `project` is the immutable base62 project ID via the MODRINTH_PROJECT_ID repo variable (the
+    # API wants the ID, not the slug). dependencies declares packetevents (its project ID) as required.
     - name: Publish to Modrinth
-      uses: Kir-Antipov/mc-publish@995edadc13559a8b28d0b7e6571229f067ec7659 # v3.3.0
+      uses: cloudnode-pro/modrinth-publish@8dc596b20b94959bf244180235d90729d05a674f # v2.4.1
+      continue-on-error: true
       with:
-        modrinth-id: firefly-plugin
-        modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-        files: target/Firefly-${{ steps.version.outputs.VERSION }}.jar
-        name: Firefly ${{ steps.version.outputs.VERSION }}
+        token: ${{ secrets.MODRINTH_TOKEN }}
+        project: ${{ vars.MODRINTH_PROJECT_ID }}
         version: ${{ steps.version.outputs.VERSION }}
-        version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+        name: Firefly ${{ steps.version.outputs.VERSION }}
+        channel: ${{ github.event.release.prerelease && 'beta' || 'release' }}
         changelog: ${{ github.event.release.body }}
-        loaders: |
+        loaders: |-
           paper
           spigot
           folia
-        game-versions: |
+        game-versions: |-
           1.21.6
           1.21.7
           1.21.8
@@ -117,5 +115,6 @@ jobs:
           26.1
           26.1.1
           26.1.2
-        dependencies: |
-          packetevents(required)
+        files: target/Firefly-${{ steps.version.outputs.VERSION }}.jar
+        dependencies: |-
+          [{ "project_id": "HYKaKraK", "dependency_type": "required" }]
