@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-06-16
+
+### Added
+- Firefly is now distributed on **Modrinth** in addition to GitHub Releases; each published release
+  is uploaded automatically.
+- The project is now licensed under **GPL-3.0-only** (added `LICENSE`).
+
+### Changed
+- Compatibility is now verified across the full supported range: the build compiles and tests against
+  the **1.21.6** floor (the minimum supported version), and a dedicated forward-compatibility job
+  verifies the latest supported build (**Minecraft 26.1.2**).
+
 ## [1.1.1] - 2026-06-15
 
 ### Security
@@ -24,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colored with legacy `&` codes, and reloaded with `/firefly reload`; missing keys fall back to the
   built-in defaults.
 
-[Unreleased]: https://github.com/GooberCraft/Firefly/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/GooberCraft/Firefly/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/GooberCraft/Firefly/releases/tag/v1.1.2
 [1.1.1]: https://github.com/GooberCraft/Firefly/releases/tag/v1.1.1
 [1.1.0]: https://github.com/GooberCraft/Firefly/releases/tag/v1.1.0
