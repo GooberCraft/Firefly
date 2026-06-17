@@ -19,7 +19,8 @@ jobs:
     steps:
     # Block mode: fail the build on any egress outside this allowlist. The list is exactly the
     # workflow-specific hosts (Sigstore for the attestation + the three Maven repos + GitHub
-    # API/git/upload + the Modrinth API for publishing); GitHub Actions runtime endpoints
+    # API/git/upload + the Modrinth API and Mojang's piston-meta version manifest for publishing);
+    # GitHub Actions runtime endpoints
     # (*.actions.githubusercontent.com, *.blob.core.windows.net, the OIDC token host) are allowed
     # by harden-runner's baseline.
     - name: Harden runner
@@ -31,6 +32,7 @@ jobs:
           api.modrinth.com:443
           fulcio.sigstore.dev:443
           github.com:443
+          piston-meta.mojang.com:443
           rekor.sigstore.dev:443
           repo.codemc.io:443
           repo.maven.apache.org:443
