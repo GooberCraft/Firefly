@@ -32,7 +32,7 @@
              on it). The ceiling workflow overrides both coordinates (to mockbukkit-v26.1.2) so the
              full test suite runs against the 26.x ceiling too. -->
         <mockbukkit.artifact>mockbukkit-v1.21</mockbukkit.artifact>
-        <mockbukkit.version>4.59.0</mockbukkit.version>
+        <mockbukkit.version>4.110.0</mockbukkit.version>
     </properties>
 
     <build>
