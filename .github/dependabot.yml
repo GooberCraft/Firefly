@@ -24,6 +24,11 @@ updates:
       # still proposed automatically.
       - dependency-name: "io.papermc.paper:paper-api"
         update-types: ["version-update:semver-major"]
+      # MockBukkit is pinned to the 1.21.6 floor: mockbukkit-v1.21:4.59.0 is the newest
+      # build that runs on Paper 1.21.6 (4.60.0+ require 1.21.7+ and refuse to run on it).
+      # The version is bumped manually in lockstep with paper.api.version, so ignore all
+      # automatic updates for this coordinate.
+      - dependency-name: "org.mockbukkit.mockbukkit:mockbukkit-v1.21"
     # Group minor and patch updates together
     groups:
       test-dependencies:
