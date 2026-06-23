@@ -30,7 +30,7 @@ jobs:
         egress-policy: audit
 
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     # 26.x requires Java 25, and the 26.1.2 paper-api is Java 25 bytecode, so the compile target is
     # raised to 25 here (the default build stays on the Java 21 floor).
