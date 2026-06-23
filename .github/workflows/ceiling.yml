@@ -48,7 +48,7 @@ jobs:
     - name: Build, test, and verify against ceiling API
       run: >
         mvn -B -ntp -nsu clean verify
-        -Dpaper.api.version=26.1.2.build.70-stable
+        -Dpaper.api.version=26.1.2.build.72-stable
         -Dmockbukkit.artifact=mockbukkit-v26.1.2
         -Dmockbukkit.version=4.113.2
         -Djava.version=25
