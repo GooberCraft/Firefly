@@ -92,7 +92,7 @@ jobs:
     # `project` is the immutable base62 project ID via the MODRINTH_PROJECT_ID repo variable (the
     # API wants the ID, not the slug). dependencies declares packetevents (its project ID) as required.
     - name: Publish to Modrinth
-      uses: cloudnode-pro/modrinth-publish@8dc596b20b94959bf244180235d90729d05a674f # v2.4.1
+      uses: cloudnode-pro/modrinth-publish@150bec632db186f87c686435b29c55e7543107ea # v2.5.0
       continue-on-error: true
       with:
         token: ${{ secrets.MODRINTH_TOKEN }}
