@@ -17,7 +17,7 @@ jobs:
     steps:
       # Network + runtime security monitoring for the runner (audit: observe-only, no egress blocked).
       - name: Harden runner
-        uses: step-security/harden-runner@v2.19.4
+        uses: step-security/harden-runner@v2.20.0
         with:
           egress-policy: audit
 
