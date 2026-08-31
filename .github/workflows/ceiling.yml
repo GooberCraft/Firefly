@@ -35,7 +35,7 @@ jobs:
     # 26.x requires Java 25, and the 26.1.2 paper-api is Java 25 bytecode, so the compile target is
     # raised to 25 here (the default build stays on the Java 21 floor).
     - name: Set up JDK 25
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@v6
       with:
         java-version: 25
         distribution: 'temurin'
