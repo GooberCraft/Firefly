@@ -53,7 +53,7 @@ Firefly requires the [packetevents](https://www.spigotmc.org/resources/packeteve
 
 ## Compatibility
 
-- **Minecraft**: 1.21.6+ (locator bar) through 26.1.x
+- **Minecraft**: 1.21.6+ (locator bar) through 26.2
 - **Server Software**: Spigot, Paper, Purpur, or any Spigot-based server
 - **Dependencies**: packetevents
 - **Java Version**: 21+ (tested on Java 21 and 25)

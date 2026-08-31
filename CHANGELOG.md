@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Minecraft 26.2 is now a supported and verified target.** No plugin changes were required (the
+  `WAYPOINT` packet format is unchanged from 1.21.6 through 26.2), but the forward-compatibility
+  ceiling job now compiles and runs the full test suite against the **26.2** Paper API
+  (`26.2.build.121-stable` + `mockbukkit-v26.2`) instead of 26.1.2, and `26.2` was added to the
+  Modrinth game-version list so releases are published for it.
+
+### Notes
+- On a **26.x** server, packetevents must be **2.13.0 or newer** (2.13.0 is the first release that
+  knows the 26.2 protocol). The 1.21.6 - 1.21.11 minimum is unchanged at 2.10.1.
+
 ## [1.1.2] - 2026-06-16
 
 ### Added
