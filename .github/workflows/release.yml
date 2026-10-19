@@ -23,7 +23,7 @@ jobs:
     # (*.actions.githubusercontent.com, *.blob.core.windows.net, the OIDC token host) are allowed
     # by harden-runner's baseline.
     - name: Harden runner
-      uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+      uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
       with:
         egress-policy: block
         allowed-endpoints: >
@@ -38,10 +38,10 @@ jobs:
           uploads.github.com:443
 
     - name: Checkout code
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Set up JDK 21
-      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+      uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
       with:
         java-version: '21'
         distribution: 'temurin'
@@ -92,7 +92,7 @@ jobs:
     # `project` is the immutable base62 project ID via the MODRINTH_PROJECT_ID repo variable (the
     # API wants the ID, not the slug). dependencies declares packetevents (its project ID) as required.
     - name: Publish to Modrinth
-      uses: cloudnode-pro/modrinth-publish@203bc72a51ae39fba1194fc4097d9f0750c49bd3 # v2.5.1
+      uses: cloudnode-pro/modrinth-publish@3870f66007063f03fb70118ca9eddbc09a4ba666 # v2.5.2
       continue-on-error: true
       with:
         token: ${{ secrets.MODRINTH_TOKEN }}
@@ -116,6 +116,7 @@ jobs:
           26.1.1
           26.1.2
           26.2
+          26.3
         files: target/Firefly-${{ steps.version.outputs.VERSION }}.jar
         dependencies: |-
           [{ "project_id": "HYKaKraK", "dependency_type": "required" }]

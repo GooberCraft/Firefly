@@ -29,6 +29,11 @@ updates:
       # The version is bumped manually in lockstep with paper.api.version, so ignore all
       # automatic updates for this coordinate.
       - dependency-name: "org.mockbukkit.mockbukkit:mockbukkit-v1.21"
+      # packetevents is pinned to the supported floor (packetevents.version in pom.xml) so the
+      # build fails if we use API newer than the minimum servers may run. It is provided by the
+      # server, so a newer version brings no fixes to users; it moves only when the supported
+      # minimum does (the ceiling workflow overrides it to test newer releases).
+      - dependency-name: "com.github.retrooper:packetevents-spigot"
     # Group minor and patch updates together
     groups:
       test-dependencies:

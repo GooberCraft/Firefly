@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Bundled **H2 updated to 2.5.252** (from 2.4.240), which fixes a URL-injection issue, adds a
+  deserialization filter, and fixes `SecureFileStore` skipping decryption. Existing `firefly.mv.db`
+  files open unchanged (verified both upgrading and downgrading between 2.4.240 and 2.5.252).
+
+### Changed
+- **Minecraft 26.3 is now a supported and verified target.** No plugin changes were required
+  (packetevents' waypoint packet handling is unchanged from 2.10.1 through 2.14.0, the release that
+  added 26.3).
+- The build now compiles against the **minimum supported packetevents, 2.10.1** (it had drifted to
+  2.13.0 through automated updates), so using newer packetevents API fails the build instead of
+  breaking older servers. The compiled plugin is byte-for-byte identical.
+- Test dependency Mockito updated to 5.24.0.
+
+### Notes
+- On a **26.3** server, packetevents must be **2.14.0 or newer** (2.14.0 is the first release that
+  knows the 26.3 protocol). The minimums are unchanged elsewhere: 2.10.1 on 1.21.6 - 1.21.11 and
+  2.13.0 on 26.1 - 26.2.
+
 ## [1.1.3] - 2026-08-31
 
 ### Changed

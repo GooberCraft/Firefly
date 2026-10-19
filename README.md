@@ -21,18 +21,20 @@ locator control, so packetevents is a hard dependency.
 ## Requirements
 
 - A **Paper, Spigot, or Folia 1.21.6+** server (the locator bar exists from 1.21.6 onward; Firefly
-  is verified up to **Minecraft 26.2**). Folia is fully supported.
+  is verified up to **Minecraft 26.3**). Folia is fully supported.
 - The **[packetevents](https://www.spigotmc.org/resources/packetevents.80279/)** plugin, installed in
   `plugins/`. Firefly will refuse to enable without it.
   - On **1.21.6 - 1.21.11**: **version 2.10.1 or newer** (2.10.1 is the first release with the full
     locator-bar waypoint API Firefly relies on; older builds will fail at runtime).
-  - On **26.x**: **version 2.13.0 or newer**. 2.13.0 is the first release that knows the 26.2
-    protocol, and earlier builds cannot read the packets on a 26.x server.
+  - On **26.1 - 26.2**: **version 2.13.0 or newer**. 2.13.0 is the first release that knows the
+    26.2 protocol, and earlier builds cannot read the packets on a 26.x server.
+  - On **26.3**: **version 2.14.0 or newer**. 2.14.0 is the first release that knows the 26.3
+    protocol.
 - Clients on 1.21.6+ to actually render the locator bar.
 
 ## Installation
 
-1. Install the **packetevents** plugin (**2.10.1+**, or **2.13.0+** on a 26.x server) in your server's `plugins/` folder.
+1. Install the **packetevents** plugin (**2.10.1+**; **2.13.0+** on 26.1 - 26.2; **2.14.0+** on 26.3) in your server's `plugins/` folder.
 2. Drop `Firefly-1.0.jar` (from `target/` after building) into `plugins/`.
 3. Start the server. Firefly creates `plugins/Firefly/config.yml`, `messages.yml` (and `playerdata.yml`
    when using the default YAML storage). It works out of the box — no configuration required.
