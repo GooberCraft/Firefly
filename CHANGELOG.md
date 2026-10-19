@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-10-19
+
 ### Security
 - Bundled **H2 updated to 2.5.252** (from 2.4.240), which fixes a URL-injection issue, adds a
   deserialization filter, and fixes `SecureFileStore` skipping decryption. Existing `firefly.mv.db`
@@ -68,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colored with legacy `&` codes, and reloaded with `/firefly reload`; missing keys fall back to the
   built-in defaults.
 
-[Unreleased]: https://github.com/GooberCraft/Firefly/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/GooberCraft/Firefly/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/GooberCraft/Firefly/releases/tag/v1.1.4
 [1.1.3]: https://github.com/GooberCraft/Firefly/releases/tag/v1.1.3
 [1.1.2]: https://github.com/GooberCraft/Firefly/releases/tag/v1.1.2
 [1.1.1]: https://github.com/GooberCraft/Firefly/releases/tag/v1.1.1
